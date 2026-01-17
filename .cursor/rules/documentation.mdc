@@ -1,0 +1,97 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Documentation Guidelines
+
+## Core Principles
+
+### Documentation Purpose
+- Help users understand how to use the software
+- Enable developers to maintain and extend the code
+- Capture design decisions and architectural context
+- Provide operational knowledge for support staff
+
+### Documentation as Code
+- Store documentation with code in version control
+- Review documentation changes alongside code changes
+- Keep documentation up-to-date with every code change
+
+### Audience Awareness
+- Write for the specific audience (users, developers, ops)
+- Consider the technical level of the audience
+
+### Code Comments
+- Comment why, not what (code should be self-documenting)
+- Document non-obvious design decisions
+- Explain complex algorithms and business rules
+- Document temporary solutions and technical debt
+- All comments must be writted in English even if user is using another language
+
+## API Documentation
+
+### API Reference
+- Document all public endpoints
+- Include request and response formats
+- Document error responses and codes
+- Describe authentication and authorization requirements
+
+### Examples and Tutorials
+- Provide code examples for common use cases
+- Include step-by-step tutorials for complex workflows
+- Document integration patterns
+- Show complete, working examples
+
+### Versioning
+- Document API versioning strategy
+- Clearly mark deprecated features
+- Provide migration guides for breaking changes
+- Document API lifecycle (beta, stable, deprecated)
+
+## System Documentation
+
+### Architecture Documentation
+- Document system components and their relationships
+- Include architecture diagrams (C4 model recommended)
+- Describe data flows and state transitions
+- Document integration points with external systems
+
+### Operational Documentation
+- Include deployment instructions
+- Document configuration options
+- Provide troubleshooting guides
+- Include runbooks for common operational tasks
+
+### Monitoring and Alerting
+- Document what is being monitored
+- Describe alert thresholds and severity levels
+- Include incident response procedures
+- Document logging and observability practices
+
+## Documentation Maintenance
+
+### Keeping Documentation Current
+- Update documentation with every code change
+- Regularly review documentation for accuracy
+- Remove outdated documentation
+- Mark documentation with last-reviewed dates
+
+### Documentation Reviews
+- Include documentation in code reviews
+- Verify technical accuracy
+- Check readability and clarity
+- Ensure completeness for the target audience
+
+### Documentation Testing
+- Test code examples to ensure they work
+- Verify links are not broken
+- Test installation and configuration instructions
+- Check documentation renders correctly in all formats
+
+## Documentation Format and Structure
+
+### Consistent Style
+- Follow a style guide for technical writing
+- Maintain consistent formatting
+- Use templates for common documentation types
