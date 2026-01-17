@@ -1,19 +1,22 @@
 """Router for script execution endpoints."""
 
 import time
-from typing import Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, HTTPException
 
-from src.config import settings
-from src.logger import logger
-from src.script_executor.schemas import ScriptExecutionResponse
+from src.logger import get_logger
+from src.script_executor.schemas import (
+    ScriptExecutionRequest,
+    ScriptExecutionResponse,
+)
 from src.script_executor.service import ScriptExecutionError, ScriptExecutorService
 
+
+logger = get_logger(__name__)
 router = APIRouter(prefix="/scripts", tags=["scripts"])
 
 # Initialize service
-script_executor = ScriptExecutorService()
+script_executor: ScriptExecutorService = ScriptExecutorService()
 
 
 @router.post(
@@ -22,47 +25,33 @@ script_executor = ScriptExecutorService()
     summary="Execute Python script",
     description=(
         "Execute a Python script from the scripts directory. "
-        "Supports flexible input: JSON data, parameters, and file uploads. "
-        "Script receives data via INPUT_DATA global variable."
+        "Script must contain a 'main(data: dict) -> dict' function. "
+        "Receives JSON in request body, returns JSON in response."
     ),
 )
 async def execute_script(
     script_path: str,
-    json_data: Optional[str] = Form(
-        default=None,
-        description="JSON data as string (will be parsed)",
-    ),
-    params: Optional[str] = Form(
-        default=None,
-        description="Additional parameters as JSON string",
-    ),
-    files: Optional[list[UploadFile]] = File(
-        default=None,
-        description="Files to upload and pass to script",
-    ),
+    request: ScriptExecutionRequest,
 ) -> ScriptExecutionResponse:
     """
-    Execute a Python script with flexible input data.
+    Execute a Python script by calling its main() function.
     
-    The script receives all input data via a global variable `INPUT_DATA`:
-    - JSON data and parameters are merged into INPUT_DATA
-    - Files are stored in temporary directory, paths stored in INPUT_DATA["_files"]
+    Script requirements:
+    - Must be a single .py file
+    - Must contain a function: def main(data: dict) -> dict
+    - Function receives JSON data as dict
+    - Function must return a dict (or None, which becomes empty dict)
     
-    Example INPUT_DATA structure:
-    {
-        "key1": "value1",
-        "key2": {"nested": "data"},
-        "_files": {
-            "uploaded_file.txt": "/tmp/xyz/uploaded_file.txt"
-        },
-        "_temp_dir": "/tmp/xyz"
-    }
+    Example script:
+    ```python
+    def main(data: dict) -> dict:
+        name = data.get("name", "Unknown")
+        return {"message": f"Hello, {name}!"}
+    ```
     
     Args:
         script_path: Relative path to script from scripts directory
-        json_data: JSON data as string (optional)
-        params: Additional parameters as JSON string (optional)
-        files: List of uploaded files (optional)
+        request: ScriptExecutionRequest with data dict
         
     Returns:
         ScriptExecutionResponse with execution result
@@ -70,57 +59,16 @@ async def execute_script(
     Raises:
         HTTPException: If script execution fails
     """
-    start_time = time.time()
+    start_time: float = time.time()
     
     try:
-        # Parse JSON data if provided
-        parsed_json_data: Optional[dict] = None
-        if json_data:
-            import json
-            try:
-                parsed_json_data = json.loads(json_data)
-            except json.JSONDecodeError as e:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid JSON data: {str(e)}",
-                )
-        
-        # Parse params if provided
-        parsed_params: Optional[dict[str, str]] = None
-        if params:
-            import json
-            try:
-                parsed_params = json.loads(params)
-            except json.JSONDecodeError as e:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid params JSON: {str(e)}",
-                )
-        
-        # Read uploaded files
-        file_data: Optional[dict[str, bytes]] = None
-        if files:
-            file_data = {}
-            for file in files:
-                if file.filename:
-                    content = await file.read()
-                    # Check file size
-                    if len(content) > settings.max_file_size:
-                        raise HTTPException(
-                            status_code=413,
-                            detail=f"File {file.filename} exceeds maximum size of {settings.max_file_size} bytes",
-                        )
-                    file_data[file.filename] = content
-        
         # Execute script
-        result = script_executor.execute_script(
+        result: dict = script_executor.execute_script(
             script_path=script_path,
-            json_data=parsed_json_data,
-            params=parsed_params,
-            files=file_data,
+            data=request.data,
         )
         
-        execution_time = time.time() - start_time
+        execution_time: float = time.time() - start_time
         
         return ScriptExecutionResponse(
             success=True,
@@ -129,25 +77,24 @@ async def execute_script(
         )
         
     except ValueError as e:
-        execution_time = time.time() - start_time
-        logger.error(f"Validation error: {str(e)}")
+        execution_time: float = time.time() - start_time
+        logger.error("Validation error", error=str(e), script_path=script_path)
         raise HTTPException(
             status_code=404,
             detail=str(e),
         )
     except ScriptExecutionError as e:
-        execution_time = time.time() - start_time
-        logger.error(f"Script execution error: {str(e)}")
+        execution_time: float = time.time() - start_time
+        logger.error("Script execution error", error=str(e), script_path=script_path)
         return ScriptExecutionResponse(
             success=False,
             error=str(e),
             execution_time=execution_time,
         )
     except Exception as e:
-        execution_time = time.time() - start_time
-        logger.error(f"Unexpected error: {str(e)}")
+        execution_time: float = time.time() - start_time
+        logger.error("Unexpected error", error=str(e), script_path=script_path, exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error: {str(e)}",
         )
-

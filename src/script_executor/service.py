@@ -6,10 +6,12 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from src.config import settings
-from src.logger import logger
+from src.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class ScriptExecutionError(Exception):
@@ -40,10 +42,10 @@ class ScriptExecutorService:
             ValueError: If path is invalid or script doesn't exist
         """
         # Normalize path (remove leading slashes, resolve ..)
-        normalized_path = script_path.lstrip("/")
+        normalized_path: str = script_path.lstrip("/")
         
         # Resolve absolute path
-        absolute_path = (self.scripts_dir / normalized_path).resolve()
+        absolute_path: Path = (self.scripts_dir / normalized_path).resolve()
         
         # Security check: ensure path is within scripts directory
         try:
@@ -66,41 +68,19 @@ class ScriptExecutorService:
 
     def _prepare_script_input(
         self,
-        json_data: Optional[dict[str, Any]] = None,
-        params: Optional[dict[str, str]] = None,
-        files: Optional[dict[str, bytes]] = None,
+        data: dict[str, Any],
     ) -> dict[str, Any]:
         """
         Prepare input data for script execution.
         
         Args:
-            json_data: JSON data to pass
-            params: Additional string parameters
-            files: Uploaded files as bytes
+            data: JSON data to pass to main() function
             
         Returns:
             Dictionary with prepared input data
         """
-        input_data: dict[str, Any] = {}
-        
-        if json_data:
-            input_data.update(json_data)
-        
-        if params:
-            input_data.update(params)
-        
-        if files:
-            # Store files in temporary directory and pass paths
-            temp_dir = tempfile.mkdtemp()
-            file_paths = {}
-            for filename, file_content in files.items():
-                temp_file_path = Path(temp_dir) / filename
-                temp_file_path.write_bytes(file_content)
-                file_paths[filename] = str(temp_file_path)
-            input_data["_files"] = file_paths
-            input_data["_temp_dir"] = temp_dir
-        
-        return input_data
+        # Data is passed as-is to main() function
+        return data
 
     def _create_wrapper_script(
         self,
@@ -108,37 +88,45 @@ class ScriptExecutorService:
         input_data: dict[str, Any],
     ) -> Path:
         """
-        Create wrapper script that injects input data and executes target script.
+        Create wrapper script that calls main() function from target script.
         
         Args:
             script_path: Path to target script
-            input_data: Data to inject into script
+            input_data: Data to pass to main() function
             
         Returns:
             Path to wrapper script
         """
-        wrapper_content = f'''import sys
+        wrapper_content: str = f'''import sys
 import json
-import os
 from pathlib import Path
-
-# Inject input data as global variable
-INPUT_DATA = {json.dumps(input_data, indent=2)}
-
-# Make INPUT_DATA available to target script
-globals().update({{"INPUT_DATA": INPUT_DATA}})
 
 # Add scripts directory to path
 sys.path.insert(0, str(Path(r"{script_path.parent}").resolve()))
 
-# Execute target script
-with open(r"{script_path}", "r", encoding="utf-8") as f:
-    code = compile(f.read(), r"{script_path}", "exec")
-    exec(code, globals())
+# Import and execute target script
+import importlib.util
+spec = importlib.util.spec_from_file_location("user_script", r"{script_path}")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+# Check if main function exists
+if not hasattr(module, "main"):
+    raise ValueError("Script must contain a 'main' function")
+
+# Call main function with input data
+input_data = {json.dumps(input_data, indent=2)}
+result = module.main(input_data)
+
+# Output result as JSON
+if result is not None:
+    if not isinstance(result, dict):
+        raise ValueError("main() function must return a dict or None")
+    print(json.dumps(result))
 '''
         
         # Create temporary wrapper script
-        temp_wrapper = tempfile.NamedTemporaryFile(
+        temp_wrapper: tempfile._TemporaryFileWrapper[str] = tempfile.NamedTemporaryFile(
             mode="w",
             suffix=".py",
             delete=False,
@@ -152,37 +140,33 @@ with open(r"{script_path}", "r", encoding="utf-8") as f:
     def execute_script(
         self,
         script_path: str,
-        json_data: Optional[dict[str, Any]] = None,
-        params: Optional[dict[str, str]] = None,
-        files: Optional[dict[str, bytes]] = None,
+        data: dict[str, Any],
     ) -> dict[str, Any]:
         """
-        Execute Python script with provided input data.
+        Execute Python script by calling its main() function.
         
         Args:
             script_path: Relative path to script from scripts directory
-            json_data: JSON data to pass to script
-            params: Additional string parameters
-            files: Uploaded files as bytes
+            data: JSON data to pass to script's main() function
             
         Returns:
-            Dictionary with execution result
+            Dictionary with execution result (return value from main())
             
         Raises:
             ScriptExecutionError: If execution fails
         """
-        validated_path = self._validate_script_path(script_path)
-        input_data = self._prepare_script_input(json_data, params, files)
-        wrapper_script = None
+        validated_path: Path = self._validate_script_path(script_path)
+        input_data: dict[str, Any] = self._prepare_script_input(data)
+        wrapper_script: Path | None = None
         
         try:
             # Create wrapper script
             wrapper_script = self._create_wrapper_script(validated_path, input_data)
             
             # Execute script
-            logger.info(f"Executing script: {script_path}")
+            logger.info("Executing script", script_path=script_path)
             
-            result = subprocess.run(
+            result: subprocess.CompletedProcess[str] = subprocess.run(
                 [sys.executable, str(wrapper_script)],
                 capture_output=True,
                 text=True,
@@ -190,35 +174,38 @@ with open(r"{script_path}", "r", encoding="utf-8") as f:
                 cwd=str(validated_path.parent),
             )
             
-            # Clean up temporary files
-            if input_data.get("_temp_dir"):
-                shutil.rmtree(input_data["_temp_dir"], ignore_errors=True)
-            
             if result.returncode != 0:
-                error_msg = result.stderr or result.stdout or "Unknown error"
-                logger.error(f"Script execution failed: {error_msg}")
+                error_msg: str = result.stderr or result.stdout or "Unknown error"
+                logger.error("Script execution failed", script_path=script_path, error=error_msg)
                 raise ScriptExecutionError(f"Script execution failed: {error_msg}")
             
-            # Try to parse JSON output from stdout
-            output = result.stdout.strip()
+            # Parse JSON output from stdout
+            output: str = result.stdout.strip()
+            result_data: dict[str, Any]
             if output:
                 try:
                     result_data = json.loads(output)
-                except json.JSONDecodeError:
-                    # If not JSON, return as string
-                    result_data = output
+                    if not isinstance(result_data, dict):
+                        raise ScriptExecutionError(
+                            "Script main() function must return a dict or None"
+                        )
+                except json.JSONDecodeError as e:
+                    raise ScriptExecutionError(f"Script output is not valid JSON: {str(e)}")
             else:
-                result_data = {"message": "Script executed successfully"}
+                # If no output, assume None was returned
+                result_data = {}
             
-            logger.info(f"Script executed successfully: {script_path}")
+            logger.info("Script executed successfully", script_path=script_path)
             return result_data
             
         except subprocess.TimeoutExpired:
             raise ScriptExecutionError(
                 f"Script execution timeout after {self.max_execution_time} seconds"
             )
+        except ScriptExecutionError:
+            raise
         except Exception as e:
-            logger.error(f"Error executing script {script_path}: {str(e)}")
+            logger.error("Error executing script", script_path=script_path, error=str(e))
             raise ScriptExecutionError(f"Error executing script: {str(e)}")
         finally:
             # Clean up wrapper script

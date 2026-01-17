@@ -4,8 +4,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import settings
-from src.logger import logger
+from src.file_storage.router import router as file_storage_router
+from src.logger import get_logger
 from src.script_executor.router import router as script_router
+
+
+logger = get_logger(__name__)
+
 
 # Create FastAPI app
 app = FastAPI(
@@ -27,6 +32,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(script_router, prefix=settings.api_prefix)
+app.include_router(file_storage_router, prefix=settings.api_prefix)
 
 
 @app.get("/", tags=["health"])
@@ -48,12 +54,16 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     """Application startup event."""
-    logger.info(f"Starting {settings.app_name} v{settings.app_version}")
-    logger.info(f"Scripts directory: {settings.scripts_dir}")
+    logger.info(
+        "Starting application",
+        app_name=settings.app_name,
+        version=settings.app_version,
+    )
+    logger.info("Scripts directory configured", scripts_dir=str(settings.scripts_dir))
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Application shutdown event."""
-    logger.info(f"Shutting down {settings.app_name}")
+    logger.info("Shutting down application", app_name=settings.app_name)
 

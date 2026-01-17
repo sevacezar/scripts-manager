@@ -1,33 +1,32 @@
-"""Test script: receives file(s) and processes them, returns result."""
+"""Test script: receives file key in data and processes it."""
 
-import json
-from pathlib import Path
-
-# Access input data from global variable
-input_data = globals().get("INPUT_DATA", {})
-
-# Get uploaded files
-files = input_data.get("_files", {})
-
-# Process files
-processed_files = []
-for filename, file_path in files.items():
-    file_path_obj = Path(file_path)
-    if file_path_obj.exists():
-        content = file_path_obj.read_text(encoding="utf-8")
-        processed_files.append({
-            "filename": filename,
-            "size": file_path_obj.stat().st_size,
-            "lines": len(content.splitlines()),
-            "preview": content[:100],  # First 100 characters
-        })
-
-# Return result
-result = {
-    "message": f"Processed {len(processed_files)} file(s)",
-    "files": processed_files,
-}
-
-# Output result as JSON
-print(json.dumps(result))
-
+def main(data: dict) -> dict:
+    """
+    Main function that processes file key from input data.
+    
+    Args:
+        data: Input JSON data as dictionary, should contain file_key
+        
+    Returns:
+        Dictionary with processing result
+    """
+    # Get file key from input data
+    file_key: str | None = data.get("file_key")
+    
+    if not file_key:
+        return {
+            "error": "file_key is required in input data",
+            "message": "Upload file first using /api/v1/files/upload endpoint",
+        }
+    
+    # In real scenario, you would download file using file_storage client
+    # For this example, we just return the file key info
+    
+    result: dict = {
+        "message": f"File key received: {file_key}",
+        "file_key": file_key,
+        "note": "Download file using /api/v1/files/{key} endpoint",
+        "processing": "File would be processed here",
+    }
+    
+    return result
