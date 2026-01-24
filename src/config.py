@@ -1,6 +1,5 @@
 """Application configuration settings."""
 
-import os
 from pathlib import Path
 
 from pydantic import Field
@@ -22,6 +21,26 @@ class Settings(BaseSettings):
     
     # Uploads directory for file storage
     uploads_dir: Path = Path(__file__).parent.parent / "uploads"
+    
+    # Database
+    database_url: str = Field(
+        default="sqlite+aiosqlite:///./scripts_manager.db",
+        description="Database URL (SQLite for dev, PostgreSQL for prod)",
+    )
+    
+    # JWT Authentication
+    jwt_secret_key: str = Field(
+        default="your-secret-key-change-in-production",
+        description="Secret key for JWT token signing",
+    )
+    jwt_algorithm: str = Field(
+        default="HS256",
+        description="JWT algorithm",
+    )
+    jwt_access_token_expire_minutes: int = Field(
+        default=30,
+        description="Access token expiration time in minutes",
+    )
     
     # Security
     max_script_execution_time: int = 300  # seconds
