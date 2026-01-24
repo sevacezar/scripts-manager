@@ -10,6 +10,13 @@ from sqlalchemy.orm import selectinload
 from src.auth.models import User
 from src.config import settings
 from src.logger import get_logger
+from src.scripts_manager.error_codes import ErrorCode
+from src.scripts_manager.exceptions import (
+    ConflictError,
+    PermissionError,
+    ResourceNotFoundError,
+    ValidationError,
+)
 from src.scripts_manager.models import Folder, Script
 from src.scripts_manager.validators import validate_script_content
 
@@ -69,7 +76,11 @@ class ScriptsManagerService:
             parent_result = await db.execute(select(Folder).where(Folder.id == parent_id))
             parent = parent_result.scalar_one_or_none()
             if not parent:
-                raise ValueError(f"Parent folder with id {parent_id} not found")
+                raise ResourceNotFoundError(
+                    ErrorCode.PARENT_FOLDER_NOT_FOUND,
+                    f"Parent folder with id {parent_id} not found",
+                    {"parent_id": str(parent_id)},
+                )
             parent_path = parent.path
         
         # Build folder path
@@ -81,7 +92,11 @@ class ScriptsManagerService:
         # Check if folder already exists in DB
         existing = await db.execute(select(Folder).where(Folder.path == folder_path))
         if existing.scalar_one_or_none():
-            raise ValueError(f"Folder '{folder_path}' already exists")
+            raise ConflictError(
+                ErrorCode.FOLDER_ALREADY_EXISTS,
+                f"Folder '{folder_path}' already exists",
+                {"path": folder_path},
+            )
         
         # Create folder in DB only
         folder: Folder = Folder(
@@ -134,12 +149,23 @@ class ScriptsManagerService:
         """
         # Validate filename
         if not filename.endswith(".py"):
-            raise ValueError("Script filename must have .py extension")
+            raise ValidationError(
+                "Script filename must have .py extension",
+                {"filename": filename},
+            )
         
         # Validate script content
         is_valid, error_msg = validate_script_content(content)
         if not is_valid:
-            raise ValueError(f"Script validation failed: {error_msg}")
+            if "main" in error_msg.lower():
+                raise ValidationError(
+                    error_msg,
+                    {"error_code": ErrorCode.SCRIPT_MISSING_MAIN.value},
+                )
+            raise ValidationError(
+                f"Script validation failed: {error_msg}",
+                {"error_code": ErrorCode.INVALID_SCRIPT_CONTENT.value},
+            )
         
         # Get folder if specified
         folder: Folder | None = None
@@ -147,7 +173,11 @@ class ScriptsManagerService:
             folder_result = await db.execute(select(Folder).where(Folder.id == folder_id))
             folder = folder_result.scalar_one_or_none()
             if not folder:
-                raise ValueError(f"Folder with id {folder_id} not found")
+                raise ResourceNotFoundError(
+                    ErrorCode.FOLDER_NOT_FOUND,
+                    f"Folder with id {folder_id} not found",
+                    {"folder_id": str(folder_id)},
+                )
         
         # Build logical path
         logical_path: str = self._build_logical_path(filename, folder)
@@ -160,12 +190,18 @@ class ScriptsManagerService:
         
         if existing_script:
             if not replace:
-                raise ValueError(
-                    f"Script '{logical_path}' already exists. Use replace=True to replace it."
+                raise ConflictError(
+                    ErrorCode.SCRIPT_EXISTS_REPLACE_REQUIRED,
+                    f"Script '{logical_path}' already exists. Use replace=True to replace it.",
+                    {"logical_path": logical_path, "script_id": str(existing_script.id)},
                 )
             # Check permissions for replacement
             if existing_script.created_by_id != user.id and not user.is_admin:
-                raise ValueError("You don't have permission to replace this script")
+                raise PermissionError(
+                    ErrorCode.NOT_SCRIPT_OWNER,
+                    "You don't have permission to replace this script",
+                    {"script_id": str(existing_script.id)},
+                )
             
             # Update existing script
             existing_script.filename = filename
@@ -270,11 +306,19 @@ class ScriptsManagerService:
         script: Script | None = result.scalar_one_or_none()
         
         if not script:
-            raise ValueError(f"Script with id {script_id} not found")
+            raise ResourceNotFoundError(
+                ErrorCode.SCRIPT_NOT_FOUND,
+                f"Script with id {script_id} not found",
+                {"script_id": str(script_id)},
+            )
         
         # Check permissions
         if script.created_by_id != user.id and not user.is_admin:
-            raise ValueError("You don't have permission to edit this script")
+            raise PermissionError(
+                ErrorCode.NOT_SCRIPT_OWNER,
+                "You don't have permission to edit this script",
+                {"script_id": str(script_id)},
+            )
         
         # Update metadata
         if display_name is not None:
@@ -285,7 +329,10 @@ class ScriptsManagerService:
         # Handle filename change (changes logical_path)
         if filename is not None:
             if not filename.endswith(".py"):
-                raise ValueError("Script filename must have .py extension")
+                raise ValidationError(
+                    "Script filename must have .py extension",
+                    {"filename": filename},
+                )
             
             # Build new logical path (folder is already loaded)
             new_logical_path: str = self._build_logical_path(filename, script.folder)
@@ -296,7 +343,11 @@ class ScriptsManagerService:
             )
             existing: Script | None = existing_result.scalar_one_or_none()
             if existing and existing.id != script_id:
-                raise ValueError(f"Script '{new_logical_path}' already exists")
+                raise ConflictError(
+                    ErrorCode.SCRIPT_ALREADY_EXISTS,
+                    f"Script '{new_logical_path}' already exists",
+                    {"logical_path": new_logical_path},
+                )
             
             # Update logical path and filename
             script.filename = filename
@@ -342,11 +393,19 @@ class ScriptsManagerService:
         script: Script | None = result.scalar_one_or_none()
         
         if not script:
-            raise ValueError(f"Script with id {script_id} not found")
+            raise ResourceNotFoundError(
+                ErrorCode.SCRIPT_NOT_FOUND,
+                f"Script with id {script_id} not found",
+                {"script_id": str(script_id)},
+            )
         
         # Check permissions
         if script.created_by_id != user.id and not user.is_admin:
-            raise ValueError("You don't have permission to delete this script")
+            raise PermissionError(
+                ErrorCode.NOT_SCRIPT_OWNER,
+                "You don't have permission to delete this script",
+                {"script_id": str(script_id)},
+            )
         
         # Store logical_path for logging before deletion
         logical_path: str = script.logical_path
@@ -399,11 +458,19 @@ class ScriptsManagerService:
         folder: Folder | None = result.scalar_one_or_none()
         
         if not folder:
-            raise ValueError(f"Folder with id {folder_id} not found")
+            raise ResourceNotFoundError(
+                ErrorCode.FOLDER_NOT_FOUND,
+                f"Folder with id {folder_id} not found",
+                {"folder_id": str(folder_id)},
+            )
         
         # Check permissions
         if folder.created_by_id != user.id and not user.is_admin:
-            raise ValueError("You don't have permission to edit this folder")
+            raise PermissionError(
+                ErrorCode.NOT_FOLDER_OWNER,
+                "You don't have permission to edit this folder",
+                {"folder_id": str(folder_id)},
+            )
         
         if name is not None:
             # Build new path
@@ -419,7 +486,11 @@ class ScriptsManagerService:
             # Check if new path exists
             existing = await db.execute(select(Folder).where(Folder.path == new_path))
             if existing.scalar_one_or_none():
-                raise ValueError(f"Folder '{new_path}' already exists")
+                raise ConflictError(
+                    ErrorCode.FOLDER_ALREADY_EXISTS,
+                    f"Folder '{new_path}' already exists",
+                    {"path": new_path},
+                )
             
             # Update folder and all children paths recursively
             await self._update_folder_path_recursive(db, folder, new_path)
@@ -557,12 +628,20 @@ class ScriptsManagerService:
         folder: Folder | None = result.scalar_one_or_none()
         
         if not folder:
-            raise ValueError(f"Folder with id {folder_id} not found")
+            raise ResourceNotFoundError(
+                ErrorCode.FOLDER_NOT_FOUND,
+                f"Folder with id {folder_id} not found",
+                {"folder_id": str(folder_id)},
+            )
         
         # Check permissions recursively
         can_delete, error_msg = await self._check_folder_deletion_permissions(db, folder, user)
         if not can_delete:
-            raise ValueError(error_msg or "You don't have permission to delete this folder")
+            raise PermissionError(
+                ErrorCode.NOT_ALL_OWNER,
+                error_msg or "You don't have permission to delete this folder",
+                {"folder_id": str(folder_id)},
+            )
         
         # Collect all scripts to delete (for logging and file deletion)
         all_scripts: list[Script] = []
@@ -835,12 +914,20 @@ class ScriptsManagerService:
         script: Script | None = result.scalar_one_or_none()
         
         if not script:
-            raise ValueError(f"Script with id {script_id} not found")
+            raise ResourceNotFoundError(
+                ErrorCode.SCRIPT_NOT_FOUND,
+                f"Script with id {script_id} not found",
+                {"script_id": str(script_id)},
+            )
         
         storage_path: Path = self.scripts_dir / script.storage_filename
         
         if not storage_path.exists():
-            raise ValueError(f"Script file '{script.storage_filename}' not found in filesystem")
+            raise ResourceNotFoundError(
+                ErrorCode.SCRIPT_NOT_FOUND,
+                f"Script file '{script.storage_filename}' not found in filesystem",
+                {"storage_filename": script.storage_filename, "script_id": str(script_id)},
+            )
         
         return storage_path.read_text(encoding="utf-8")
 

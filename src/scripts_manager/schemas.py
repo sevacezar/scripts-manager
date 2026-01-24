@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from src.scripts_manager.error_codes import ErrorCode
+
 
 class UserInfo(BaseModel):
     """User information for responses."""
@@ -163,5 +165,16 @@ class ScriptsTreeResponse(BaseModel):
     root_folders: list[FolderTreeItem] = Field(
         default_factory=list,
         description="Folders in root",
+    )
+
+
+class ErrorResponse(BaseModel):
+    """Schema for error response."""
+
+    error_code: str = Field(description="Machine-readable error code")
+    message: str = Field(description="Human-readable error message")
+    details: dict[str, str] | None = Field(
+        default=None,
+        description="Additional error details",
     )
 

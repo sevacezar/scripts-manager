@@ -9,7 +9,10 @@ from src.auth.dependencies import get_current_active_user
 from src.auth.models import User
 from src.database import get_db
 from src.logger import get_logger
+from src.scripts_manager.error_handler import handle_scripts_manager_error
+from src.scripts_manager.exceptions import ScriptsManagerError
 from src.scripts_manager.schemas import (
+    ErrorResponse,
     FolderCreate,
     FolderResponse,
     FolderTreeItem,
@@ -28,10 +31,40 @@ router = APIRouter(prefix="/scripts-manager", tags=["scripts-manager"])
 scripts_service: ScriptsManagerService = ScriptsManagerService()
 
 
+def handle_error(error: Exception, context: str = "") -> HTTPException:
+    """
+    Handle errors and convert to HTTPException with error response format.
+    
+    Args:
+        error: Exception to handle
+        context: Additional context for logging
+        
+    Returns:
+        HTTPException with error response
+    """
+    if isinstance(error, ScriptsManagerError):
+        logger.warning(f"Scripts manager error in {context}", error=str(error), error_code=error.error_code.value)
+        return handle_scripts_manager_error(error)
+    
+    logger.error(f"Unexpected error in {context}", error=str(error), exc_info=True)
+    return HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail={
+            "error_code": "INTERNAL_ERROR",
+            "message": "An unexpected error occurred",
+        },
+    )
+
+
 @router.post(
     "/folders",
     response_model=FolderResponse,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Validation error"},
+        404: {"model": ErrorResponse, "description": "Parent folder not found"},
+        409: {"model": ErrorResponse, "description": "Folder already exists"},
+    },
     summary="Create folder",
     description="Create a new folder in scripts directory.",
 )
@@ -77,17 +110,16 @@ async def create_folder(
             can_delete=True,
         )
         
-    except ValueError as e:
-        logger.warning("Folder creation failed", error=str(e), user_id=current_user.id)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
+    except Exception as e:
+        raise handle_error(e, "create_folder")
 
 
 @router.get(
     "/folders/{folder_id}",
     response_model=FolderResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Folder not found"},
+    },
     summary="Get folder",
     description="Get folder information.",
 )
@@ -112,6 +144,8 @@ async def get_folder(
     """
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
+    from src.scripts_manager.error_codes import ErrorCode
+    from src.scripts_manager.error_handler import create_error_response
     from src.scripts_manager.models import Folder
     
     result = await db.execute(
@@ -122,9 +156,11 @@ async def get_folder(
     folder = result.scalar_one_or_none()
     
     if not folder:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Folder with id {folder_id} not found",
+        raise create_error_response(
+            ErrorCode.FOLDER_NOT_FOUND,
+            f"Folder with id {folder_id} not found",
+            status.HTTP_404_NOT_FOUND,
+            {"folder_id": str(folder_id)},
         )
     
     return FolderResponse(
@@ -143,6 +179,12 @@ async def get_folder(
 @router.put(
     "/folders/{folder_id}",
     response_model=FolderResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Validation error"},
+        403: {"model": ErrorResponse, "description": "Permission denied"},
+        404: {"model": ErrorResponse, "description": "Folder not found"},
+        409: {"model": ErrorResponse, "description": "Folder with this name already exists"},
+    },
     summary="Update folder",
     description="Update folder (rename).",
 )
@@ -201,17 +243,17 @@ async def update_folder(
             can_delete=folder_created_by_id == current_user.id or current_user.is_admin,
         )
         
-    except ValueError as e:
-        logger.warning("Folder update failed", error=str(e), folder_id=folder_id, user_id=current_user.id)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
+    except Exception as e:
+        raise handle_error(e, "update_folder")
 
 
 @router.delete(
     "/folders/{folder_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        403: {"model": ErrorResponse, "description": "Permission denied"},
+        404: {"model": ErrorResponse, "description": "Folder not found"},
+    },
     summary="Delete folder",
     description="Delete folder and all its contents.",
 )
@@ -238,18 +280,20 @@ async def delete_folder(
             user=current_user,
         )
         
-    except ValueError as e:
-        logger.warning("Folder deletion failed", error=str(e), folder_id=folder_id, user_id=current_user.id)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
+    except Exception as e:
+        raise handle_error(e, "delete_folder")
 
 
 @router.post(
     "/scripts",
     response_model=ScriptResponse,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Validation error or invalid script content"},
+        403: {"model": ErrorResponse, "description": "Permission denied"},
+        404: {"model": ErrorResponse, "description": "Folder not found"},
+        409: {"model": ErrorResponse, "description": "Script already exists (use replace=True to replace)"},
+    },
     summary="Create script",
     description="Add a new script to the system.",
 )
@@ -280,16 +324,22 @@ async def create_script(
     Raises:
         HTTPException: If creation fails
     """
+    from src.scripts_manager.error_codes import ErrorCode
+    from src.scripts_manager.error_handler import create_error_response
+    
     if not file.filename:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Filename is required",
+        raise create_error_response(
+            ErrorCode.VALIDATION_ERROR,
+            "Filename is required",
+            status.HTTP_400_BAD_REQUEST,
         )
     
     if not file.filename.endswith(".py"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File must have .py extension",
+        raise create_error_response(
+            ErrorCode.INVALID_FILENAME,
+            "File must have .py extension",
+            status.HTTP_400_BAD_REQUEST,
+            {"filename": file.filename},
         )
     
     try:
@@ -322,17 +372,16 @@ async def create_script(
             can_delete=True,
         )
         
-    except ValueError as e:
-        logger.warning("Script creation failed", error=str(e), user_id=current_user.id)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
+    except Exception as e:
+        raise handle_error(e, "create_script")
 
 
 @router.get(
     "/scripts/{script_id}",
     response_model=ScriptResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Script not found"},
+    },
     summary="Get script",
     description="Get script information.",
 )
@@ -357,6 +406,8 @@ async def get_script(
     """
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
+    from src.scripts_manager.error_codes import ErrorCode
+    from src.scripts_manager.error_handler import create_error_response
     from src.scripts_manager.models import Script
     
     result = await db.execute(
@@ -367,9 +418,11 @@ async def get_script(
     script = result.scalar_one_or_none()
     
     if not script:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Script with id {script_id} not found",
+        raise create_error_response(
+            ErrorCode.SCRIPT_NOT_FOUND,
+            f"Script with id {script_id} not found",
+            status.HTTP_404_NOT_FOUND,
+            {"script_id": str(script_id)},
         )
     
     return ScriptResponse(
@@ -389,6 +442,9 @@ async def get_script(
 
 @router.get(
     "/scripts/{script_id}/content",
+    responses={
+        404: {"model": ErrorResponse, "description": "Script not found or file missing"},
+    },
     summary="Get script content",
     description="Get script file content.",
 )
@@ -420,17 +476,19 @@ async def get_script_content(
         
         return {"content": content}
         
-    except ValueError as e:
-        logger.warning("Get script content failed", error=str(e), script_id=script_id)
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    except Exception as e:
+        raise handle_error(e, "get_script_content")
 
 
 @router.put(
     "/scripts/{script_id}",
     response_model=ScriptResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Validation error"},
+        403: {"model": ErrorResponse, "description": "Permission denied"},
+        404: {"model": ErrorResponse, "description": "Script not found"},
+        409: {"model": ErrorResponse, "description": "Script with this name already exists"},
+    },
     summary="Update script",
     description="Update script metadata or rename.",
 )
@@ -496,17 +554,17 @@ async def update_script(
             can_delete=script_created_by_id == current_user.id or current_user.is_admin,
         )
         
-    except ValueError as e:
-        logger.warning("Script update failed", error=str(e), script_id=script_id, user_id=current_user.id)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
+    except Exception as e:
+        raise handle_error(e, "update_script")
 
 
 @router.delete(
     "/scripts/{script_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        403: {"model": ErrorResponse, "description": "Permission denied"},
+        404: {"model": ErrorResponse, "description": "Script not found"},
+    },
     summary="Delete script",
     description="Delete a script.",
 )
@@ -533,12 +591,8 @@ async def delete_script(
             user=current_user,
         )
         
-    except ValueError as e:
-        logger.warning("Script deletion failed", error=str(e), script_id=script_id, user_id=current_user.id)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
+    except Exception as e:
+        raise handle_error(e, "delete_script")
 
 
 @router.get(
