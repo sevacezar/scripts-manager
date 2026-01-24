@@ -2,8 +2,10 @@
 
 import time
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.database import get_db
 from src.logger import get_logger
 from src.script_executor.schemas import (
     ScriptExecutionRequest,
@@ -32,6 +34,7 @@ script_executor: ScriptExecutorService = ScriptExecutorService()
 async def execute_script(
     script_path: str,
     request: ScriptExecutionRequest,
+    db: AsyncSession = Depends(get_db),
 ) -> ScriptExecutionResponse:
     """
     Execute a Python script by calling its main() function.
@@ -50,8 +53,9 @@ async def execute_script(
     ```
     
     Args:
-        script_path: Relative path to script from scripts directory
+        script_path: Logical path to script (e.g., "geology/test.py")
         request: ScriptExecutionRequest with data dict
+        db: Database session
         
     Returns:
         ScriptExecutionResponse with execution result
@@ -63,8 +67,9 @@ async def execute_script(
     
     try:
         # Execute script
-        result: dict = script_executor.execute_script(
-            script_path=script_path,
+        result: dict = await script_executor.execute_script(
+            db=db,
+            logical_path=script_path,
             data=request.data,
         )
         

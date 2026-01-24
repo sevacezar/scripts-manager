@@ -8,8 +8,12 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.config import settings
+from src.database import get_db
 from src.logger import get_logger
+from src.scripts_manager.service import ScriptsManagerService
 
 logger = get_logger(__name__)
 
@@ -27,44 +31,47 @@ class ScriptExecutorService:
         """Initialize script executor service."""
         self.scripts_dir = settings.scripts_dir.resolve()
         self.max_execution_time = settings.max_script_execution_time
+        self.scripts_manager = ScriptsManagerService()
 
-    def _validate_script_path(self, script_path: str) -> Path:
+    async def _get_script_storage_path(
+        self,
+        db: AsyncSession,
+        logical_path: str,
+    ) -> Path:
         """
-        Validate and resolve script path.
+        Get script storage path by logical path.
         
         Args:
-            script_path: Relative path to script from scripts directory
+            db: Database session
+            logical_path: Logical path (e.g., "geology/test.py")
             
         Returns:
-            Absolute path to script
+            Absolute path to script file
             
         Raises:
-            ValueError: If path is invalid or script doesn't exist
+            ValueError: If script not found
         """
-        # Normalize path (remove leading slashes, resolve ..)
-        normalized_path: str = script_path.lstrip("/")
+        # Get script from DB by logical path
+        script = await self.scripts_manager.get_script_by_logical_path(db, logical_path)
         
-        # Resolve absolute path
-        absolute_path: Path = (self.scripts_dir / normalized_path).resolve()
+        if not script:
+            raise ValueError(f"Script '{logical_path}' not found")
         
-        # Security check: ensure path is within scripts directory
-        try:
-            absolute_path.relative_to(self.scripts_dir)
-        except ValueError:
-            raise ValueError(f"Script path '{script_path}' is outside scripts directory")
+        # Build storage path
+        storage_path: Path = self.scripts_dir / script.storage_filename
         
         # Check if file exists
-        if not absolute_path.exists():
-            raise ValueError(f"Script '{script_path}' not found")
+        if not storage_path.exists():
+            raise ValueError(f"Script file '{script.storage_filename}' not found in filesystem")
         
         # Check file extension
-        if absolute_path.suffix not in settings.allowed_script_extensions:
+        if storage_path.suffix not in settings.allowed_script_extensions:
             raise ValueError(
-                f"Script '{script_path}' has invalid extension. "
+                f"Script '{logical_path}' has invalid extension. "
                 f"Allowed: {settings.allowed_script_extensions}"
             )
         
-        return absolute_path
+        return storage_path
 
     def _prepare_script_input(
         self,
@@ -137,16 +144,18 @@ if result is not None:
         
         return Path(temp_wrapper.name)
 
-    def execute_script(
+    async def execute_script(
         self,
-        script_path: str,
+        db: AsyncSession,
+        logical_path: str,
         data: dict[str, Any],
     ) -> dict[str, Any]:
         """
         Execute Python script by calling its main() function.
         
         Args:
-            script_path: Relative path to script from scripts directory
+            db: Database session
+            logical_path: Logical path to script (e.g., "geology/test.py")
             data: JSON data to pass to script's main() function
             
         Returns:
@@ -155,7 +164,7 @@ if result is not None:
         Raises:
             ScriptExecutionError: If execution fails
         """
-        validated_path: Path = self._validate_script_path(script_path)
+        validated_path: Path = await self._get_script_storage_path(db, logical_path)
         input_data: dict[str, Any] = self._prepare_script_input(data)
         wrapper_script: Path | None = None
         
@@ -164,19 +173,19 @@ if result is not None:
             wrapper_script = self._create_wrapper_script(validated_path, input_data)
             
             # Execute script
-            logger.info("Executing script", script_path=script_path)
+            logger.info("Executing script", logical_path=logical_path)
             
             result: subprocess.CompletedProcess[str] = subprocess.run(
                 [sys.executable, str(wrapper_script)],
                 capture_output=True,
                 text=True,
                 timeout=self.max_execution_time,
-                cwd=str(validated_path.parent),
+                cwd=str(self.scripts_dir),
             )
             
             if result.returncode != 0:
                 error_msg: str = result.stderr or result.stdout or "Unknown error"
-                logger.error("Script execution failed", script_path=script_path, error=error_msg)
+                logger.error("Script execution failed", logical_path=logical_path, error=error_msg)
                 raise ScriptExecutionError(f"Script execution failed: {error_msg}")
             
             # Parse JSON output from stdout
@@ -195,7 +204,7 @@ if result is not None:
                 # If no output, assume None was returned
                 result_data = {}
             
-            logger.info("Script executed successfully", script_path=script_path)
+            logger.info("Script executed successfully", logical_path=logical_path)
             return result_data
             
         except subprocess.TimeoutExpired:
@@ -205,7 +214,7 @@ if result is not None:
         except ScriptExecutionError:
             raise
         except Exception as e:
-            logger.error("Error executing script", script_path=script_path, error=str(e))
+            logger.error("Error executing script", logical_path=logical_path, error=str(e))
             raise ScriptExecutionError(f"Error executing script: {str(e)}")
         finally:
             # Clean up wrapper script

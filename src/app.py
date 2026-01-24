@@ -11,6 +11,7 @@ from src.file_storage.router import router as file_storage_router
 from src.logger import get_logger
 from src.script_executor.router import router as script_router
 from src.auth.router import router as auth_router
+from src.scripts_manager.router import router as scripts_manager_router
 
 
 logger = get_logger(__name__)
@@ -63,6 +64,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth_router, prefix=settings.api_prefix)
+app.include_router(scripts_manager_router, prefix=settings.api_prefix)
 app.include_router(script_router, prefix=settings.api_prefix)
 app.include_router(file_storage_router, prefix=settings.api_prefix)
 
