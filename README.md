@@ -1,18 +1,28 @@
 # Scripts Manager
 
-REST API сервис для выполнения Python скриптов с гибкой передачей данных и файловым хранилищем.
+REST API сервис для управления и выполнения Python скриптов с гибкой передачей данных, файловым хранилищем и системой управления скриптами через веб-интерфейс.
 
 ## Описание
 
-Scripts Manager позволяет выполнять Python скрипты через REST API, передавая данные в формате JSON. Сервис разработан для интеграции с ПО для гидродинамического моделирования, где Python интерпретатор имеет ограниченный набор библиотек.
+Scripts Manager — это комплексное решение для управления Python скриптами через REST API. Сервис позволяет:
+- Выполнять Python скрипты, передавая данные в формате JSON
+- Управлять скриптами и папками через веб-интерфейс (создание, редактирование, удаление)
+- Организовывать скрипты в иерархическую структуру папок
+- Работать с файловым хранилищем для передачи файлов в скрипты
+
+Сервис разработан для интеграции с ПО для гидродинамического моделирования, где Python интерпретатор имеет ограниченный набор библиотек.
 
 ## Основные возможности
 
-- ✅ Выполнение Python скриптов через REST API (JSON in/out)
-- ✅ Файловое хранилище с S3-совместимым интерфейсом
-- ✅ Безопасное выполнение скриптов (валидация путей, таймауты)
-- ✅ Структурированное логирование (structlog)
-- ✅ Гибкая архитектура (можно подключить S3 вместо локального хранилища)
+- ✅ **Управление скриптами и папками** — создание, редактирование, удаление через REST API
+- ✅ **Иерархическая организация** — структурирование скриптов в папки и подпапки
+- ✅ **Выполнение Python скриптов** через REST API (JSON in/out)
+- ✅ **Аутентификация и авторизация** — JWT токены, контроль доступа к ресурсам
+- ✅ **Файловое хранилище** с S3-совместимым интерфейсом
+- ✅ **Безопасное выполнение скриптов** (валидация путей, таймауты)
+- ✅ **Структурированное логирование** (structlog)
+- ✅ **Единый формат ошибок** с кодами для программной обработки
+- ✅ **Гибкая архитектура** (можно подключить S3 вместо локального хранилища)
 
 ## Требования
 
@@ -79,13 +89,104 @@ uv run uvicorn src.app:app --reload --host 0.0.0.0 --port 8000
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 
+**Подробная документация API для фронтенд-разработчиков:**
+- [API Documentation](./src/scripts_manager/API_DOCUMENTATION.md) — полная документация всех эндпойнтов управления скриптами и папками
+
+## Аутентификация
+
+Большинство эндпойнтов требуют аутентификации через JWT токен. Для получения токена используйте эндпойнты `/api/v1/auth/register` и `/api/v1/auth/login`.
+
+**Формат заголовка:**
+```
+Authorization: Bearer <access_token>
+```
+
+### Регистрация пользователя
+
+**POST** `/api/v1/auth/register`
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{"login": "user123", "password": "secure_password"}'
+```
+
+### Вход в систему
+
+**POST** `/api/v1/auth/login`
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"login": "user123", "password": "secure_password"}'
+```
+
+**Ответ:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+Используйте `access_token` в заголовке `Authorization` для всех последующих запросов.
+
 ## API Endpoints
+
+### Управление скриптами и папками
+
+Система управления скриптами позволяет создавать иерархическую структуру папок, загружать скрипты, редактировать их метаданные и управлять правами доступа.
+
+**Базовый путь:** `/api/v1/scripts-manager`
+
+#### Основные возможности:
+
+- **Папки:**
+  - `POST /api/v1/scripts-manager/folders` — создание папки
+  - `GET /api/v1/scripts-manager/folders/{folder_id}` — получение информации о папке
+  - `PUT /api/v1/scripts-manager/folders/{folder_id}` — переименование папки
+  - `DELETE /api/v1/scripts-manager/folders/{folder_id}` — удаление папки со всем содержимым
+
+- **Скрипты:**
+  - `POST /api/v1/scripts-manager/scripts` — загрузка нового скрипта
+  - `GET /api/v1/scripts-manager/scripts/{script_id}` — получение информации о скрипте
+  - `GET /api/v1/scripts-manager/scripts/{script_id}/content` — получение исходного кода скрипта
+  - `PUT /api/v1/scripts-manager/scripts/{script_id}` — обновление метаданных скрипта
+  - `DELETE /api/v1/scripts-manager/scripts/{script_id}` — удаление скрипта
+
+- **Дерево структуры:**
+  - `GET /api/v1/scripts-manager/tree` — получение полной иерархии всех папок и скриптов
+
+**Пример создания папки и загрузки скрипта:**
+
+```bash
+# 1. Создать папку
+curl -X POST "http://localhost:8000/api/v1/scripts-manager/folders" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "geology", "parent_id": null}'
+
+# 2. Загрузить скрипт в папку
+curl -X POST "http://localhost:8000/api/v1/scripts-manager/scripts" \
+  -H "Authorization: Bearer <token>" \
+  -F "file=@script.py" \
+  -F "display_name=Analysis Script" \
+  -F "description=Script for data analysis" \
+  -F "folder_id=1" \
+  -F "replace=false"
+```
+
+**Важно:** При загрузке скрипта, который уже существует, API вернет ошибку `SCRIPT_EXISTS_REPLACE_REQUIRED`. Фронтенд должен обработать это и предложить пользователю перезаписать скрипт, отправив запрос с `replace=true`.
+
+**Подробная документация:** См. [API_DOCUMENTATION.md](./src/scripts_manager/API_DOCUMENTATION.md) для полного описания всех эндпойнтов, форматов запросов/ответов и обработки ошибок.
+
+### Выполнение скриптов
 
 ### Выполнение скриптов
 
 #### POST `/api/v1/scripts/{script_path}`
 
-Выполняет Python скрипт по указанному пути.
+Выполняет Python скрипт по указанному логическому пути.
 
 **Требования к скрипту:**
 - Должен быть одним файлом `.py`
@@ -94,7 +195,9 @@ uv run uvicorn src.app:app --reload --host 0.0.0.0 --port 8000
 - Функция должна возвращать словарь (или `None`, что станет пустым `{}`)
 
 **Параметры:**
-- `script_path` (path): Относительный путь к скрипту от папки `scripts/`
+- `script_path` (path): Логический путь к скрипту (например, `geology/analysis.py` или `test_script.py` для скрипта в корне)
+
+**Примечание:** `script_path` соответствует полю `logical_path` из системы управления скриптами. Это позволяет выполнять скрипты, организованные в папки, используя их логический путь.
 
 **Тело запроса (JSON):**
 ```json
@@ -286,6 +389,23 @@ scripts_manager/
 │   ├── app.py                      # Главное приложение FastAPI
 │   ├── config.py                    # Конфигурация
 │   ├── logger.py                    # Настройка логирования
+│   ├── database.py                  # Настройка базы данных
+│   ├── auth/                        # Модуль аутентификации
+│   │   ├── models.py                # Модели пользователей
+│   │   ├── router.py                # Эндпойнты регистрации/входа
+│   │   ├── service.py               # Сервис аутентификации (JWT)
+│   │   ├── schemas.py               # Схемы для аутентификации
+│   │   └── dependencies.py          # Зависимости для проверки токенов
+│   ├── scripts_manager/             # Модуль управления скриптами и папками
+│   │   ├── models.py                # Модели папок и скриптов
+│   │   ├── router.py                # Эндпойнты управления скриптами/папками
+│   │   ├── service.py               # Бизнес-логика управления
+│   │   ├── schemas.py               # Схемы запросов/ответов
+│   │   ├── validators.py            # Валидация скриптов (проверка main())
+│   │   ├── error_codes.py           # Коды ошибок
+│   │   ├── exceptions.py            # Кастомные исключения
+│   │   ├── error_handler.py         # Обработка ошибок
+│   │   └── API_DOCUMENTATION.md     # Подробная документация API
 │   ├── file_storage/
 │   │   ├── __init__.py              # Экспорт классов
 │   │   ├── client.py                # Протокол и LocalFileStorage
@@ -295,30 +415,38 @@ scripts_manager/
 │       ├── router.py                # Эндпойнт выполнения скриптов
 │       ├── service.py               # Сервис выполнения (через main())
 │       └── schemas.py               # Схемы запросов/ответов
-├── scripts/                         # Директория со скриптами
-│   ├── test/                        # Тестовые скрипты
-│   ├── hydrodynamics/               # Скрипты для гидродинамики
-│   └── geology/                     # Скрипты для геологии
+├── scripts/                         # Директория со скриптами (физическое хранилище)
+│   └── [скрипты хранятся здесь с уникальными именами]
 ├── uploads/                         # Локальное файловое хранилище
+├── scripts_manager.db               # SQLite база данных (структура папок и метаданные)
 ├── pyproject.toml                   # Зависимости проекта
-└── README.md                         # Документация
+└── README.md                        # Документация
 ```
+
+**Важно:** Структура папок и скриптов управляется через базу данных, а не через файловую систему. Все скрипты физически хранятся в корне директории `scripts/`, а логическая иерархия (папки) хранится в базе данных.
 
 ## Безопасность
 
-- ✅ Валидация путей скриптов (защита от path traversal)
-- ✅ Ограничение времени выполнения скриптов
-- ✅ Ограничение размера загружаемых файлов
-- ✅ Проверка расширений файлов
-- ✅ Изоляция выполнения скриптов (subprocess)
-- ✅ Генерация случайных имен файлов (избежание коллизий)
+- ✅ **Аутентификация и авторизация** — JWT токены, проверка прав доступа
+- ✅ **Контроль доступа к ресурсам** — только владельцы и администраторы могут редактировать/удалять
+- ✅ **Валидация путей скриптов** (защита от path traversal)
+- ✅ **Валидация содержимого скриптов** — проверка наличия функции `main()`
+- ✅ **Ограничение времени выполнения скриптов**
+- ✅ **Ограничение размера загружаемых файлов**
+- ✅ **Проверка расширений файлов**
+- ✅ **Изоляция выполнения скриптов** (subprocess)
+- ✅ **Генерация уникальных имен файлов** (избежание коллизий)
+- ✅ **Единый формат ошибок** — не раскрывает внутреннюю структуру системы
 
 ## Конфигурация
 
 Настройки можно изменить в `src/config.py` или через переменные окружения:
 
-- `SCRIPTS_DIR` - директория со скриптами
-- `UPLOADS_DIR` - директория для файлового хранилища
+- `SCRIPTS_DIR` - директория со скриптами (по умолчанию `./scripts`)
+- `UPLOADS_DIR` - директория для файлового хранилища (по умолчанию `./uploads`)
+- `DATABASE_URL` - URL базы данных (по умолчанию SQLite: `sqlite+aiosqlite:///./scripts_manager.db`)
+- `JWT_SECRET_KEY` - секретный ключ для JWT токенов (обязательно для production)
+- `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` - время жизни токена (по умолчанию 30 минут)
 - `MAX_SCRIPT_EXECUTION_TIME` - максимальное время выполнения (секунды, по умолчанию 300)
 - `MAX_FILE_SIZE` - максимальный размер файла (байты, по умолчанию 100MB)
 - `DEBUG` - режим отладки
@@ -348,7 +476,53 @@ curl -X POST "http://localhost:8000/api/v1/scripts/test/test_args_in_request_arg
   -d '{"data": {"name": "World", "value": 42}}'
 ```
 
-### Пример 2: Работа с файлами
+### Пример 2: Управление скриптами через API
+
+**Шаг 1: Регистрация и вход**
+```bash
+# Регистрация
+curl -X POST "http://localhost:8000/api/v1/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{"login": "developer", "password": "secure_pass"}'
+
+# Вход
+TOKEN=$(curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"login": "developer", "password": "secure_pass"}' | jq -r '.access_token')
+```
+
+**Шаг 2: Создание папки и загрузка скрипта**
+```bash
+# Создать папку
+curl -X POST "http://localhost:8000/api/v1/scripts-manager/folders" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my_scripts", "parent_id": null}'
+
+# Загрузить скрипт в папку
+curl -X POST "http://localhost:8000/api/v1/scripts-manager/scripts" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@my_script.py" \
+  -F "display_name=My Script" \
+  -F "description=Test script" \
+  -F "folder_id=1" \
+  -F "replace=false"
+```
+
+**Шаг 3: Получение дерева структуры**
+```bash
+curl "http://localhost:8000/api/v1/scripts-manager/tree" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Шаг 4: Выполнение скрипта по логическому пути**
+```bash
+curl -X POST "http://localhost:8000/api/v1/scripts/my_scripts/my_script.py" \
+  -H "Content-Type: application/json" \
+  -d '{"data": {"key": "value"}}'
+```
+
+### Пример 3: Работа с файлами
 
 **Шаг 1: Загрузка файла**
 ```bash
@@ -373,9 +547,20 @@ curl "http://localhost:8000/api/v1/files/test/result_xyz789.txt"
 
 ### Добавление нового скрипта
 
+**Через API (рекомендуется):**
+
+1. Получите JWT токен через `/api/v1/auth/login`
+2. Создайте папку (опционально) через `POST /api/v1/scripts-manager/folders`
+3. Загрузите скрипт через `POST /api/v1/scripts-manager/scripts` с файлом и метаданными
+4. Выполните скрипт через `POST /api/v1/scripts/{logical_path}`
+
+**Вручную (для разработки):**
+
 1. Создайте файл в директории `scripts/` (например, `scripts/my_script.py`)
 2. Напишите функцию `main(data: dict) -> dict`
 3. Вызовите скрипт через API: `POST /api/v1/scripts/my_script.py`
+
+**Примечание:** Скрипты, добавленные вручную, не будут видны в системе управления скриптами до тех пор, пока не будут загружены через API.
 
 ### Тестирование
 
@@ -419,6 +604,23 @@ class S3FileStorage(FileStorageClient):
 ```
 
 Затем замените `LocalFileStorage` на `S3FileStorage` в `src/file_storage/router.py`.
+
+### Использование другой базы данных
+
+По умолчанию используется SQLite. Для использования PostgreSQL или MySQL:
+
+1. Установите соответствующий драйвер (например, `asyncpg` для PostgreSQL)
+2. Измените `DATABASE_URL` в конфигурации:
+   ```
+   DATABASE_URL=postgresql+asyncpg://user:password@localhost/dbname
+   ```
+3. Убедитесь, что база данных создана и доступна
+
+## Дополнительная документация
+
+- **[API Documentation](./src/scripts_manager/API_DOCUMENTATION.md)** — полная документация всех эндпойнтов управления скриптами и папками для фронтенд-разработчиков
+- **Swagger UI** — интерактивная документация API: http://localhost:8000/docs
+- **ReDoc** — альтернативная документация API: http://localhost:8000/redoc
 
 ## Лицензия
 
