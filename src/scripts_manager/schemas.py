@@ -118,6 +118,10 @@ class ScriptUpdate(BaseModel):
         max_length=255,
         description="New filename",
     )
+    content: str | None = Field(
+        default=None,
+        description="New script content (Python code). If provided, content will be validated (main function required).",
+    )
 
 
 class ScriptResponse(BaseModel):

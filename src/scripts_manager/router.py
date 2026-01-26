@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Body, Depends, Form, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import get_current_active_user
@@ -299,10 +299,10 @@ async def delete_folder(
 )
 async def create_script(
     file: UploadFile,
-    display_name: str,
-    description: str | None = None,
-    folder_id: int | None = None,
-    replace: bool = False,
+    display_name: str = Form(...),
+    description: str | None = Form(None),
+    folder_id: int | None = Form(None),
+    replace: bool = Form(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> ScriptResponse:
@@ -346,12 +346,18 @@ async def create_script(
         # Read file content
         content: str = (await file.read()).decode("utf-8")
         
+        # Normalize folder_id: convert empty string or 0 to None
+        normalized_folder_id: int | None = folder_id if folder_id else None
+        
+        # Normalize description: convert empty string to None
+        normalized_description: str | None = description if description and description.strip() else None
+        
         script = await scripts_service.create_script(
             db=db,
             filename=file.filename,
             display_name=display_name,
-            description=description,
-            folder_id=folder_id,
+            description=normalized_description,
+            folder_id=normalized_folder_id,
             content=content,
             user=current_user,
             replace=replace,
@@ -374,6 +380,115 @@ async def create_script(
         
     except Exception as e:
         raise handle_error(e, "create_script")
+
+
+@router.post(
+    "/scripts-from-text",
+    response_model=ScriptResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Validation error or invalid script content"},
+        403: {"model": ErrorResponse, "description": "Permission denied"},
+        404: {"model": ErrorResponse, "description": "Folder not found"},
+        409: {"model": ErrorResponse, "description": "Script already exists (use replace=True to replace)"},
+    },
+    summary="Create script from text",
+    description="Create a new script by providing code directly (without file upload).",
+)
+async def create_script_from_text(
+    filename: str = Body(..., description="Script filename with .py extension"),
+    display_name: str = Body(..., description="Display name for the script"),
+    content: str = Body(..., description="Script content (Python code)"),
+    description: str | None = Body(None, description="Optional description"),
+    folder_id: int | None = Body(None, description="Optional folder ID"),
+    replace: bool = Body(False, description="Replace existing script if it exists"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> ScriptResponse:
+    """
+    Create a new script from text content.
+    
+    Args:
+        filename: Script filename (must end with .py)
+        display_name: Display name for the script
+        content: Script content (Python code)
+        description: Optional description
+        folder_id: Optional folder ID (None for root)
+        replace: If True, replace existing script in the same logical folder
+        db: Database session
+        current_user: Current authenticated user
+        
+    Returns:
+        Created script information
+        
+    Raises:
+        HTTPException: If creation fails
+    """
+    from src.scripts_manager.error_codes import ErrorCode
+    from src.scripts_manager.error_handler import create_error_response
+    
+    # Validate filename
+    if not filename.endswith(".py"):
+        raise create_error_response(
+            ErrorCode.INVALID_FILENAME,
+            "File must have .py extension",
+            status.HTTP_400_BAD_REQUEST,
+            {"filename": filename},
+        )
+    
+    # Validate filename length
+    if len(filename) < 4 or len(filename) > 255:
+        raise create_error_response(
+            ErrorCode.VALIDATION_ERROR,
+            "Filename must be between 4 and 255 characters",
+            status.HTTP_400_BAD_REQUEST,
+            {"filename": filename},
+        )
+    
+    # Validate content is not empty
+    if not content or not content.strip():
+        raise create_error_response(
+            ErrorCode.VALIDATION_ERROR,
+            "Script content cannot be empty",
+            status.HTTP_400_BAD_REQUEST,
+        )
+    
+    try:
+        # Normalize folder_id: convert empty string or 0 to None
+        normalized_folder_id: int | None = folder_id if folder_id else None
+        
+        # Normalize description: convert empty string to None
+        normalized_description: str | None = description if description and description.strip() else None
+        
+        # Create script - validation (including main function check) is performed in service
+        script = await scripts_service.create_script(
+            db=db,
+            filename=filename,
+            display_name=display_name,
+            description=normalized_description,
+            folder_id=normalized_folder_id,
+            content=content,
+            user=current_user,
+            replace=replace,
+        )
+        
+        # Load relationships (already loaded by service)
+        return ScriptResponse(
+            id=script.id,
+            filename=script.filename,
+            logical_path=script.logical_path,
+            display_name=script.display_name,
+            description=script.description,
+            folder_id=script.folder_id,
+            created_by={"id": script.created_by.id, "login": script.created_by.login},
+            created_at=script.created_at,
+            updated_at=script.updated_at,
+            can_edit=True,
+            can_delete=True,
+        )
+        
+    except Exception as e:
+        raise handle_error(e, "create_script_from_text")
 
 
 @router.get(
@@ -490,7 +605,7 @@ async def get_script_content(
         409: {"model": ErrorResponse, "description": "Script with this name already exists"},
     },
     summary="Update script",
-    description="Update script metadata or rename.",
+    description="Update script metadata, rename, or update content. If content is provided, it will be validated (main function required).",
 )
 async def update_script(
     script_id: int,
@@ -520,6 +635,7 @@ async def update_script(
             display_name=script_data.display_name,
             description=script_data.description,
             filename=script_data.filename,
+            content=script_data.content,
             user=current_user,
         )
         

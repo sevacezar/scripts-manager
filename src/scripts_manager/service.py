@@ -278,10 +278,11 @@ class ScriptsManagerService:
         display_name: str | None,
         description: str | None,
         filename: str | None,
+        content: str | None,
         user: User,
     ) -> Script:
         """
-        Update script metadata or rename.
+        Update script metadata, rename, or update content.
         
         Args:
             db: Database session
@@ -289,6 +290,7 @@ class ScriptsManagerService:
             display_name: New display name
             description: New description
             filename: New filename (changes logical_path)
+            content: New script content (if provided, will be validated)
             user: User updating the script
             
         Returns:
@@ -325,6 +327,25 @@ class ScriptsManagerService:
             script.display_name = display_name
         if description is not None:
             script.description = description
+        
+        # Handle content update (requires validation)
+        if content is not None:
+            # Validate script content
+            is_valid, error_msg = validate_script_content(content)
+            if not is_valid:
+                if "main" in error_msg.lower():
+                    raise ValidationError(
+                        error_msg,
+                        {"error_code": ErrorCode.SCRIPT_MISSING_MAIN.value},
+                    )
+                raise ValidationError(
+                    f"Script validation failed: {error_msg}",
+                    {"error_code": ErrorCode.INVALID_SCRIPT_CONTENT.value},
+                )
+            
+            # Update file content
+            storage_path: Path = self.scripts_dir / script.storage_filename
+            storage_path.write_text(content, encoding="utf-8")
         
         # Handle filename change (changes logical_path)
         if filename is not None:
