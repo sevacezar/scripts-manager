@@ -1,5 +1,5 @@
-import { useState, FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, FormEvent, ChangeEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { ApiError } from '../types/api';
 
@@ -8,20 +8,88 @@ const Register = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { register: handleRegister } = useAuth();
+  const navigate = useNavigate();
+
+  // Validate login: letters, numbers, "-", "_", length 3-50
+  const validateLogin = (value: string): string | null => {
+    if (value.length === 0) {
+      return null; // Don't show error for empty field
+    }
+    if (value.length < 3) {
+      return 'Login must be at least 3 characters';
+    }
+    if (value.length > 50) {
+      return 'Login must be no more than 50 characters';
+    }
+    const loginRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!loginRegex.test(value)) {
+      return 'Login can only contain letters, numbers, "-" and "_"';
+    }
+    return null;
+  };
+
+  // Validate password: minimum 8 characters
+  const validatePassword = (value: string): string | null => {
+    if (value.length === 0) {
+      return null; // Don't show error for empty field
+    }
+    if (value.length < 8) {
+      return 'Password must be at least 8 characters';
+    }
+    return null;
+  };
+
+  const handleLoginChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setLogin(value);
+    setLoginError(validateLogin(value));
+    setError(null); // Clear general error when user starts typing
+  };
+
+  const handlePasswordChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setPassword(value);
+    setPasswordError(validatePassword(value));
+    setError(null); // Clear general error when user starts typing
+    
+    // Re-validate confirm password if it's already filled
+    if (confirmPassword) {
+      setConfirmPasswordError(
+        value !== confirmPassword ? 'Passwords do not match' : null
+      );
+    }
+  };
+
+  const handleConfirmPasswordChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setConfirmPassword(value);
+    setConfirmPasswordError(
+      value !== password ? 'Passwords do not match' : null
+    );
+    setError(null); // Clear general error when user starts typing
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
+    // Validate all fields
+    const loginValidationError = validateLogin(login);
+    const passwordValidationError = validatePassword(password);
+    const confirmPasswordValidationError = password !== confirmPassword 
+      ? 'Passwords do not match' 
+      : null;
 
-    if (password.length < 3) {
-      setError('Password must be at least 3 characters');
+    setLoginError(loginValidationError);
+    setPasswordError(passwordValidationError);
+    setConfirmPasswordError(confirmPasswordValidationError);
+
+    if (loginValidationError || passwordValidationError || confirmPasswordValidationError) {
       return;
     }
 
@@ -29,10 +97,21 @@ const Register = () => {
 
     try {
       await handleRegister({ login, password });
+      // Registration successful - redirect to login page immediately
+      navigate('/login');
     } catch (err) {
       const apiError = err as ApiError;
-      setError(apiError.message || 'Registration failed');
-    } finally {
+      const errorMessage = apiError.message || 'Registration failed';
+      
+      // Check if user already exists (various possible error messages)
+      const lowerMessage = errorMessage.toLowerCase();
+      if (lowerMessage.includes('already exists') || 
+          lowerMessage.includes('user with login') ||
+          lowerMessage.includes('already exist')) {
+        setError(`User with login "${login}" already exists. Please choose a different login.`);
+      } else {
+        setError(errorMessage);
+      }
       setIsLoading(false);
     }
   };
@@ -62,10 +141,22 @@ const Register = () => {
                 type="text"
                 required
                 value={login}
-                onChange={(e) => setLogin(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                onChange={handleLoginChange}
+                className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary ${
+                  loginError ? 'border-red-300' : 'border-gray-300'
+                }`}
                 aria-label="Login input"
+                aria-invalid={!!loginError}
+                aria-describedby={loginError ? 'login-error login-help' : 'login-help'}
               />
+              {loginError && (
+                <p id="login-error" className="mt-1 text-sm text-red-600" role="alert">
+                  {loginError}
+                </p>
+              )}
+              <p id="login-help" className="mt-1 text-xs text-gray-500">
+                Login must be 3-50 characters and can only contain letters, numbers, "-" and "_"
+              </p>
             </div>
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
@@ -77,10 +168,22 @@ const Register = () => {
                 type="password"
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                onChange={handlePasswordChange}
+                className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary ${
+                  passwordError ? 'border-red-300' : 'border-gray-300'
+                }`}
                 aria-label="Password input"
+                aria-invalid={!!passwordError}
+                aria-describedby={passwordError ? 'password-error password-help' : 'password-help'}
               />
+              {passwordError && (
+                <p id="password-error" className="mt-1 text-sm text-red-600" role="alert">
+                  {passwordError}
+                </p>
+              )}
+              <p id="password-help" className="mt-1 text-xs text-gray-500">
+                Password must be at least 8 characters long
+              </p>
             </div>
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
@@ -92,10 +195,19 @@ const Register = () => {
                 type="password"
                 required
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                onChange={handleConfirmPasswordChange}
+                className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary ${
+                  confirmPasswordError ? 'border-red-300' : 'border-gray-300'
+                }`}
                 aria-label="Confirm password input"
+                aria-invalid={!!confirmPasswordError}
+                aria-describedby={confirmPasswordError ? 'confirm-password-error' : undefined}
               />
+              {confirmPasswordError && (
+                <p id="confirm-password-error" className="mt-1 text-sm text-red-600" role="alert">
+                  {confirmPasswordError}
+                </p>
+              )}
             </div>
           </div>
 

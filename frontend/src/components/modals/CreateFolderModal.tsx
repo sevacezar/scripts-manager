@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useRef, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { ApiError } from '../../types/api';
@@ -13,6 +13,14 @@ const CreateFolderModal = ({ parentId, onClose, onSuccess }: CreateFolderModalPr
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Auto-focus input field when modal opens
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -57,6 +65,7 @@ const CreateFolderModal = ({ parentId, onClose, onSuccess }: CreateFolderModalPr
               Folder Name
             </label>
             <input
+              ref={inputRef}
               id="folderName"
               type="text"
               required
@@ -93,4 +102,5 @@ const CreateFolderModal = ({ parentId, onClose, onSuccess }: CreateFolderModalPr
 };
 
 export default CreateFolderModal;
+
 

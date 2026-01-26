@@ -76,10 +76,20 @@ export interface CreateScriptRequest {
   replace?: boolean;
 }
 
+export interface CreateScriptFromTextRequest {
+  filename: string;
+  display_name: string;
+  content: string;
+  description?: string;
+  folder_id?: number | null;
+  replace?: boolean;
+}
+
 export interface UpdateScriptRequest {
   display_name?: string;
   description?: string;
   filename?: string;
+  content?: string;
 }
 
 export interface ApiError {
@@ -87,4 +97,5 @@ export interface ApiError {
   message: string;
   details?: Record<string, unknown>;
 }
+
 

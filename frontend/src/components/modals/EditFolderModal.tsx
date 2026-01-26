@@ -98,3 +98,4 @@ const EditFolderModal = ({ folder, onClose, onSuccess }: EditFolderModalProps) =
 
 export default EditFolderModal;
 
+

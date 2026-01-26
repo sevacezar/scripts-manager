@@ -9,6 +9,7 @@ import type {
   CreateFolderRequest,
   UpdateFolderRequest,
   CreateScriptRequest,
+  CreateScriptFromTextRequest,
   UpdateScriptRequest,
   ApiError,
 } from '../types/api';
@@ -25,8 +26,8 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const token = this.getToken();
-    const headers: HeadersInit = {
-      ...options.headers,
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string>),
     };
 
     // Only set Content-Type for JSON requests (not FormData)
@@ -45,17 +46,48 @@ class ApiClient {
       });
 
       // Handle 401 Unauthorized - token expired or invalid
+      // Don't redirect if this is a login/register request (let the component handle the error)
       if (response.status === 401) {
-        localStorage.removeItem('access_token');
-        window.location.href = '/login';
-        throw new Error('Session expired. Please login again.');
+        // Only redirect for protected endpoints, not for auth endpoints
+        const isAuthEndpoint = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
+        if (!isAuthEndpoint) {
+          localStorage.removeItem('access_token');
+          window.location.href = '/login';
+          throw new Error('Session expired. Please login again.');
+        }
       }
 
       if (!response.ok) {
-        const error: ApiError = await response.json().catch(() => ({
-          error_code: 'UNKNOWN_ERROR',
-          message: 'An unknown error occurred',
-        }));
+        let error: ApiError;
+        try {
+          const errorData = await response.json();
+          // Handle FastAPI error format with detail as object: { "detail": { "error_code": "...", "message": "..." } }
+          if (errorData.detail && typeof errorData.detail === 'object' && !Array.isArray(errorData.detail) && !errorData.error_code) {
+            // detail is an object with error_code and message
+            error = {
+              error_code: errorData.detail.error_code || 'UNKNOWN_ERROR',
+              message: errorData.detail.message || 'An error occurred',
+              details: errorData.detail.details,
+            };
+          } 
+          // Handle FastAPI error format: { "detail": "error message" } (simple string)
+          else if (errorData.detail && typeof errorData.detail === 'string' && !errorData.error_code) {
+            error = {
+              error_code: 'UNKNOWN_ERROR',
+              message: errorData.detail,
+            };
+          } 
+          // Handle structured error format: { "error_code": "...", "message": "..." }
+          else {
+            error = errorData as ApiError;
+          }
+        } catch {
+          // If response is not JSON, create a generic error
+          error = {
+            error_code: 'UNKNOWN_ERROR',
+            message: `Request failed with status ${response.status}`,
+          };
+        }
         throw error;
       }
 
@@ -161,10 +193,36 @@ class ApiClient {
       }
 
       if (!response.ok) {
-        const error: ApiError = await response.json().catch(() => ({
-          error_code: 'UNKNOWN_ERROR',
-          message: 'An unknown error occurred',
-        }));
+        let error: ApiError;
+        try {
+          const errorData = await response.json();
+          // Handle FastAPI error format with detail as object: { "detail": { "error_code": "...", "message": "..." } }
+          if (errorData.detail && typeof errorData.detail === 'object' && !Array.isArray(errorData.detail) && !errorData.error_code) {
+            // detail is an object with error_code and message
+            error = {
+              error_code: errorData.detail.error_code || 'UNKNOWN_ERROR',
+              message: errorData.detail.message || 'An error occurred',
+              details: errorData.detail.details,
+            };
+          } 
+          // Handle FastAPI error format: { "detail": "error message" } (simple string)
+          else if (errorData.detail && typeof errorData.detail === 'string' && !errorData.error_code) {
+            error = {
+              error_code: 'UNKNOWN_ERROR',
+              message: errorData.detail,
+            };
+          } 
+          // Handle structured error format: { "error_code": "...", "message": "..." }
+          else {
+            error = errorData as ApiError;
+          }
+        } catch {
+          // If response is not JSON, create a generic error
+          error = {
+            error_code: 'UNKNOWN_ERROR',
+            message: `Request failed with status ${response.status}`,
+          };
+        }
         throw error;
       }
 
@@ -191,6 +249,13 @@ class ApiClient {
   async deleteScript(scriptId: number): Promise<void> {
     return this.request<void>(`/scripts-manager/scripts/${scriptId}`, {
       method: 'DELETE',
+    });
+  }
+
+  async createScriptFromText(data: CreateScriptFromTextRequest): Promise<Script> {
+    return this.request<Script>('/scripts-manager/scripts-from-text', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 }

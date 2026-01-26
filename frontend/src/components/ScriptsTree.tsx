@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import type { TreeResponse, FolderTreeItem, Script, Folder, ApiError } from '../types/api';
+import type { TreeResponse, FolderTreeItem, Script, ApiError } from '../types/api';
 import { ChevronRight, ChevronDown, Folder as FolderIcon, FileCode, Trash2, Edit2, Eye } from 'lucide-react';
 import CreateFolderModal from './modals/CreateFolderModal';
 import CreateScriptModal from './modals/CreateScriptModal';
@@ -13,10 +13,23 @@ interface FolderItemProps {
   level: number;
   onRefresh: () => void;
   onViewScript: (script: Script) => void;
+  expandedFolders: Set<number>;
+  onToggleFolder: (folderId: number, isExpanded: boolean) => void;
 }
 
-const FolderItem = ({ folderItem, level, onRefresh, onViewScript }: FolderItemProps) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+const FolderItem = ({ folderItem, level, onRefresh, onViewScript, expandedFolders, onToggleFolder }: FolderItemProps) => {
+  const [isExpanded, setIsExpanded] = useState(expandedFolders.has(folderItem.folder.id));
+  
+  // Sync with parent state when folder ID changes
+  useEffect(() => {
+    setIsExpanded(expandedFolders.has(folderItem.folder.id));
+  }, [folderItem.folder.id, expandedFolders]);
+
+  const handleToggle = () => {
+    const newExpanded = !isExpanded;
+    setIsExpanded(newExpanded);
+    onToggleFolder(folderItem.folder.id, newExpanded);
+  };
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showCreateScript, setShowCreateScript] = useState(false);
   const [showEditFolder, setShowEditFolder] = useState(false);
@@ -43,12 +56,13 @@ const FolderItem = ({ folderItem, level, onRefresh, onViewScript }: FolderItemPr
   return (
     <div>
       <div
-        className="flex items-center gap-2 py-1 px-2 hover:bg-gray-100 rounded cursor-pointer group"
+        className="flex items-center gap-2 py-1 px-2 hover:bg-gray-100 rounded cursor-pointer group min-w-0"
         style={{ paddingLeft: `${level * 1.5}rem` }}
+        onDoubleClick={handleToggle}
       >
         <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="p-1 hover:bg-gray-200 rounded"
+          onClick={handleToggle}
+          className="p-1 hover:bg-gray-200 rounded flex-shrink-0"
           tabIndex={0}
           aria-label={isExpanded ? 'Collapse folder' : 'Expand folder'}
         >
@@ -58,39 +72,38 @@ const FolderItem = ({ folderItem, level, onRefresh, onViewScript }: FolderItemPr
             <ChevronRight className="w-4 h-4 text-gray-600" />
           )}
         </button>
-        <FolderIcon className="w-4 h-4 text-primary" />
-        <span className="flex-1 text-sm font-medium text-gray-700">{folderItem.folder.name}</span>
+        <FolderIcon className="w-4 h-4 text-primary flex-shrink-0" />
+        <span className="flex-1 text-sm font-medium text-gray-700 min-w-0 truncate">{folderItem.folder.name}</span>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Any user can create folders and scripts in any directory */}
+          <button
+            onClick={() => setShowCreateFolder(true)}
+            className="p-1 hover:bg-gray-200 rounded text-xs text-gray-600"
+            tabIndex={0}
+            aria-label="Create subfolder"
+            title="Create subfolder"
+          >
+            + Folder
+          </button>
+          <button
+            onClick={() => setShowCreateScript(true)}
+            className="p-1 hover:bg-gray-200 rounded text-xs text-gray-600"
+            tabIndex={0}
+            aria-label="Create script"
+            title="Create script"
+          >
+            + Script
+          </button>
           {folderItem.folder.can_edit && (
-            <>
-              <button
-                onClick={() => setShowCreateFolder(true)}
-                className="p-1 hover:bg-gray-200 rounded text-xs text-gray-600"
-                tabIndex={0}
-                aria-label="Create subfolder"
-                title="Create subfolder"
-              >
-                + Folder
-              </button>
-              <button
-                onClick={() => setShowCreateScript(true)}
-                className="p-1 hover:bg-gray-200 rounded text-xs text-gray-600"
-                tabIndex={0}
-                aria-label="Create script"
-                title="Create script"
-              >
-                + Script
-              </button>
-              <button
-                onClick={() => setShowEditFolder(true)}
-                className="p-1 hover:bg-gray-200 rounded"
-                tabIndex={0}
-                aria-label="Edit folder"
-                title="Edit folder"
-              >
-                <Edit2 className="w-4 h-4 text-gray-600" />
-              </button>
-            </>
+            <button
+              onClick={() => setShowEditFolder(true)}
+              className="p-1 hover:bg-gray-200 rounded"
+              tabIndex={0}
+              aria-label="Edit folder"
+              title="Edit folder"
+            >
+              <Edit2 className="w-4 h-4 text-gray-600" />
+            </button>
           )}
           {folderItem.folder.can_delete && (
             <button
@@ -124,6 +137,8 @@ const FolderItem = ({ folderItem, level, onRefresh, onViewScript }: FolderItemPr
               level={level + 1}
               onRefresh={onRefresh}
               onViewScript={onViewScript}
+              expandedFolders={expandedFolders}
+              onToggleFolder={onToggleFolder}
             />
           ))}
         </div>
@@ -225,16 +240,27 @@ const ScriptItem = ({ script, level, onRefresh, onView }: ScriptItemProps) => {
   return (
     <>
       <div
-        className="flex items-center gap-2 py-1 px-2 hover:bg-gray-100 rounded cursor-pointer group"
+        className="flex items-center gap-2 py-1 px-2 hover:bg-gray-100 rounded cursor-pointer group min-w-0"
         style={{ paddingLeft: `${level * 1.5}rem` }}
       >
-        <FileCode className="w-4 h-4 text-primary" />
-        <span
-          className="flex-1 text-sm text-gray-700 hover:text-primary cursor-pointer"
+        <FileCode className="w-4 h-4 text-primary flex-shrink-0" />
+        <div
+          className="flex-1 flex items-center gap-2 cursor-pointer min-w-0"
           onClick={() => onView(script)}
+          title={script.display_name !== script.filename ? script.display_name : undefined}
         >
-          {script.display_name}
-        </span>
+          <span className="text-sm text-gray-700 hover:text-primary font-medium flex-shrink-0">
+            {script.filename}
+          </span>
+          {script.display_name !== script.filename && (
+            <span 
+              className="text-xs text-gray-500 italic whitespace-nowrap flex-shrink-0" 
+              title={script.display_name}
+            >
+              ({script.display_name})
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={() => onView(script)}
@@ -319,6 +345,28 @@ const ScriptsTree = () => {
   const [selectedScript, setSelectedScript] = useState<Script | null>(null);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showCreateScript, setShowCreateScript] = useState(false);
+  const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
+  const [viewerWidth, setViewerWidth] = useState(() => {
+    const savedWidth = localStorage.getItem('script-viewer-width');
+    return savedWidth ? parseFloat(savedWidth) : 50; // Percentage, default 50%
+  });
+  const [isResizing, setIsResizing] = useState(false);
+
+  const handleToggleFolder = (folderId: number, isExpanded: boolean) => {
+    setExpandedFolders((prev) => {
+      const newSet = new Set(prev);
+      if (isExpanded) {
+        newSet.add(folderId);
+      } else {
+        newSet.delete(folderId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleMouseDown = () => {
+    setIsResizing(true);
+  };
 
   const loadTree = async () => {
     setIsLoading(true);
@@ -326,6 +374,7 @@ const ScriptsTree = () => {
     try {
       const data = await apiClient.getTree();
       setTree(data);
+      // Keep expanded folders state after refresh
     } catch (err) {
       setError('Failed to load scripts tree');
     } finally {
@@ -336,6 +385,45 @@ const ScriptsTree = () => {
   useEffect(() => {
     loadTree();
   }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      const container = document.querySelector('.scripts-tree-container');
+      if (!container) return;
+      
+      const containerRect = container.getBoundingClientRect();
+      // Calculate viewer width based on mouse position
+      // Mouse position relative to right edge of container
+      const mouseX = e.clientX - containerRect.left;
+      const containerWidth = containerRect.width;
+      const newViewerWidth = ((containerWidth - mouseX) / containerWidth) * 100;
+      
+      // Limit width between 20% and 80%
+      const clampedWidth = Math.max(20, Math.min(80, newViewerWidth));
+      setViewerWidth(clampedWidth);
+      localStorage.setItem('script-viewer-width', clampedWidth.toString());
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
 
   if (isLoading) {
     return (
@@ -365,8 +453,14 @@ const ScriptsTree = () => {
   }
 
   return (
-    <div className="flex h-full">
-      <div className="flex-1 overflow-auto p-4">
+    <div className="flex h-full scripts-tree-container">
+      <div 
+        className="overflow-auto p-4 flex-shrink-0" 
+        style={{ 
+          width: selectedScript ? `${100 - viewerWidth}%` : '100%',
+          minWidth: selectedScript ? '200px' : 'auto'
+        }}
+      >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-800">Scripts & Folders</h2>
           <div className="flex gap-2">
@@ -404,6 +498,8 @@ const ScriptsTree = () => {
               level={0}
               onRefresh={loadTree}
               onViewScript={setSelectedScript}
+              expandedFolders={expandedFolders}
+              onToggleFolder={handleToggleFolder}
             />
           ))}
           {tree.root_scripts.length === 0 && tree.root_folders.length === 0 && (
@@ -415,10 +511,26 @@ const ScriptsTree = () => {
       </div>
 
       {selectedScript && (
-        <ScriptViewer
-          script={selectedScript}
-          onClose={() => setSelectedScript(null)}
-        />
+        <>
+          <div
+            onMouseDown={handleMouseDown}
+            className="w-1 bg-gray-300 hover:bg-primary cursor-col-resize transition-colors flex-shrink-0"
+            style={{ cursor: isResizing ? 'col-resize' : 'col-resize' }}
+            role="separator"
+            aria-label="Resize viewer"
+            aria-orientation="vertical"
+          />
+          <div style={{ width: `${viewerWidth}%` }} className="flex-shrink-0">
+            <ScriptViewer
+              script={selectedScript}
+              onClose={() => setSelectedScript(null)}
+              onScriptUpdated={(updatedScript) => {
+                setSelectedScript(updatedScript);
+                loadTree();
+              }}
+            />
+          </div>
+        </>
       )}
 
       {showCreateFolder && (

@@ -41,9 +41,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const handleRegister = async (data: RegisterRequest) => {
-    const response = await apiClient.register(data);
-    localStorage.setItem('access_token', response.access_token);
-    setIsAuthenticated(true);
+    // Registration doesn't return a token - user needs to login separately
+    await apiClient.register(data);
+    // Don't set token or authentication state - user should login after registration
   };
 
   const handleLogout = () => {
@@ -65,4 +65,5 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     </AuthContext.Provider>
   );
 };
+
 

@@ -138,3 +138,4 @@ const EditScriptModal = ({ script, onClose, onSuccess }: EditScriptModalProps) =
 
 export default EditScriptModal;
 
+
