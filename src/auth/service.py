@@ -150,7 +150,7 @@ async def create_user(db: AsyncSession, login: str, password: str, is_admin: boo
     # Check if user already exists
     existing_user = await get_user_by_login(db, login)
     if existing_user:
-        raise ValueError(f"User with login '{login}' already exists")
+        raise ValueError(f"Пользователь с логином '{login}' уже существует")
     
     # Create new user
     password_hash: str = get_password_hash(password)

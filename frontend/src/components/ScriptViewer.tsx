@@ -54,7 +54,7 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
         setContent(response.content);
         setOriginalContent(response.content);
       } catch (err) {
-        setError('Failed to load script content');
+        setError('Ошибка загрузки содержимого скрипта');
       } finally {
         setIsLoading(false);
       }
@@ -142,18 +142,18 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
     } catch (err) {
       const apiError = err as ApiError;
       // Extract detailed error message from backend
-      let errorMessage = 'Failed to save script content';
+      let errorMessage = 'Ошибка сохранения содержимого скрипта';
       
       if (apiError.message) {
         errorMessage = apiError.message;
       } else if (apiError.error_code) {
         // If we have error code but no message, create a user-friendly message
         if (apiError.error_code === 'SCRIPT_MISSING_MAIN') {
-          errorMessage = "Script must contain a 'main(data: dict) -> dict' function";
+          errorMessage = "Скрипт должен содержать функцию 'main(data: dict) -> dict'";
         } else if (apiError.error_code === 'INVALID_SCRIPT_CONTENT') {
-          errorMessage = 'Script validation failed. Please check the script content.';
+          errorMessage = 'Ошибка валидации скрипта. Проверьте содержимое скрипта.';
         } else {
-          errorMessage = `Error: ${apiError.error_code}`;
+          errorMessage = `Ошибка: ${apiError.error_code}`;
         }
       }
       
@@ -203,7 +203,7 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
               onClick={handleStartEdit}
               className="px-3 py-1.5 text-sm bg-primary text-white rounded hover:bg-primary-dark flex items-center gap-1.5"
               tabIndex={0}
-              aria-label="Edit script"
+              aria-label="Редактировать скрипт"
             >
               <Edit2 className="w-4 h-4" />
               Редактировать
@@ -238,7 +238,7 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
       <div className="flex-1 overflow-auto p-4 flex flex-col">
         {isLoading && (
           <div className="flex items-center justify-center h-full">
-            <div className="text-gray-600">Loading...</div>
+            <div className="text-gray-600">Загрузка...</div>
           </div>
         )}
 
@@ -308,7 +308,7 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
                       disabled={isSaving}
                       className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                       tabIndex={0}
-                      aria-label="Cancel editing"
+                      aria-label="Отменить редактирование"
                     >
                       <XCircle className="w-4 h-4" />
                       Отмена
@@ -318,7 +318,7 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
                       disabled={!hasChanges || isSaving}
                       className="px-4 py-2 text-sm bg-primary text-white rounded hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                       tabIndex={0}
-                      aria-label="Save changes"
+                      aria-label="Сохранить изменения"
                     >
                       <Save className="w-4 h-4" />
                       {isSaving ? 'Сохранение...' : 'Сохранить'}
@@ -334,7 +334,7 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
                     handleStartEdit();
                   }
                 }}
-                title={script.can_edit ? 'Double-click to edit' : undefined}
+                title={script.can_edit ? 'Двойной клик для редактирования' : undefined}
               >
                 <SyntaxHighlighter
                   language="python"

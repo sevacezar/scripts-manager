@@ -45,7 +45,7 @@ const FolderItem = ({ folderItem, level, onRefresh, onViewScript, expandedFolder
       const apiError = error as ApiError;
       // Error will be handled by API client for 401, so we only show other errors
       if (apiError.error_code !== 'NETWORK_ERROR') {
-        alert(apiError.message || 'Failed to delete folder');
+        alert(apiError.message || 'Ошибка удаления папки');
       }
     } finally {
       setIsDeleting(false);
@@ -80,27 +80,27 @@ const FolderItem = ({ folderItem, level, onRefresh, onViewScript, expandedFolder
             onClick={() => setShowCreateFolder(true)}
             className="p-1 hover:bg-gray-200 rounded text-xs text-gray-600"
             tabIndex={0}
-            aria-label="Create subfolder"
-            title="Create subfolder"
+            aria-label="Создать подпапку"
+            title="Создать подпапку"
           >
-            + Folder
+            + Папка
           </button>
           <button
             onClick={() => setShowCreateScript(true)}
             className="p-1 hover:bg-gray-200 rounded text-xs text-gray-600"
             tabIndex={0}
-            aria-label="Create script"
-            title="Create script"
+            aria-label="Создать скрипт"
+            title="Создать скрипт"
           >
-            + Script
+            + Скрипт
           </button>
           {folderItem.folder.can_edit && (
             <button
               onClick={() => setShowEditFolder(true)}
               className="p-1 hover:bg-gray-200 rounded"
               tabIndex={0}
-              aria-label="Edit folder"
-              title="Edit folder"
+              aria-label="Редактировать папку"
+              title="Редактировать папку"
             >
               <Edit2 className="w-4 h-4 text-gray-600" />
             </button>
@@ -110,8 +110,8 @@ const FolderItem = ({ folderItem, level, onRefresh, onViewScript, expandedFolder
               onClick={() => setShowDeleteConfirm(true)}
               className="p-1 hover:bg-red-100 rounded"
               tabIndex={0}
-              aria-label="Delete folder"
-              title="Delete folder"
+              aria-label="Удалить папку"
+              title="Удалить папку"
             >
               <Trash2 className="w-4 h-4 text-red-600" />
             </button>
@@ -180,9 +180,9 @@ const FolderItem = ({ folderItem, level, onRefresh, onViewScript, expandedFolder
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Delete Folder</h3>
+            <h3 className="text-lg font-semibold mb-4">Удалить папку</h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete folder "{folderItem.folder.name}"? This will delete all scripts and subfolders inside.
+              Вы уверены, что хотите удалить папку "{folderItem.folder.name}"? Это удалит все скрипты и подпапки внутри.
             </p>
             <div className="flex gap-3 justify-end">
               <button
@@ -190,7 +190,7 @@ const FolderItem = ({ folderItem, level, onRefresh, onViewScript, expandedFolder
                 className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
                 tabIndex={0}
               >
-                Cancel
+                Отмена
               </button>
               <button
                 onClick={handleDelete}
@@ -198,7 +198,7 @@ const FolderItem = ({ folderItem, level, onRefresh, onViewScript, expandedFolder
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                 tabIndex={0}
               >
-                {isDeleting ? 'Deleting...' : 'Delete'}
+                {isDeleting ? 'Удаление...' : 'Удалить'}
               </button>
             </div>
           </div>
@@ -229,7 +229,7 @@ const ScriptItem = ({ script, level, onRefresh, onView }: ScriptItemProps) => {
       const apiError = error as ApiError;
       // Error will be handled by API client for 401, so we only show other errors
       if (apiError.error_code !== 'NETWORK_ERROR') {
-        alert(apiError.message || 'Failed to delete script');
+        alert(apiError.message || 'Ошибка удаления скрипта');
       }
     } finally {
       setIsDeleting(false);
@@ -266,8 +266,8 @@ const ScriptItem = ({ script, level, onRefresh, onView }: ScriptItemProps) => {
             onClick={() => onView(script)}
             className="p-1 hover:bg-gray-200 rounded"
             tabIndex={0}
-            aria-label="View script"
-            title="View script"
+            aria-label="Просмотреть скрипт"
+            title="Просмотреть скрипт"
           >
             <Eye className="w-4 h-4 text-gray-600" />
           </button>
@@ -276,8 +276,8 @@ const ScriptItem = ({ script, level, onRefresh, onView }: ScriptItemProps) => {
               onClick={() => setShowEdit(true)}
               className="p-1 hover:bg-gray-200 rounded"
               tabIndex={0}
-              aria-label="Edit script"
-              title="Edit script"
+              aria-label="Редактировать скрипт"
+              title="Редактировать скрипт"
             >
               <Edit2 className="w-4 h-4 text-gray-600" />
             </button>
@@ -287,8 +287,8 @@ const ScriptItem = ({ script, level, onRefresh, onView }: ScriptItemProps) => {
               onClick={() => setShowDelete(true)}
               className="p-1 hover:bg-red-100 rounded"
               tabIndex={0}
-              aria-label="Delete script"
-              title="Delete script"
+              aria-label="Удалить скрипт"
+              title="Удалить скрипт"
             >
               <Trash2 className="w-4 h-4 text-red-600" />
             </button>
@@ -310,9 +310,9 @@ const ScriptItem = ({ script, level, onRefresh, onView }: ScriptItemProps) => {
       {showDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Delete Script</h3>
+            <h3 className="text-lg font-semibold mb-4">Удалить скрипт</h3>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete script "{script.display_name}"?
+              Вы уверены, что хотите удалить скрипт "{script.display_name}"?
             </p>
             <div className="flex gap-3 justify-end">
               <button
@@ -320,7 +320,7 @@ const ScriptItem = ({ script, level, onRefresh, onView }: ScriptItemProps) => {
                 className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
                 tabIndex={0}
               >
-                Cancel
+                Отмена
               </button>
               <button
                 onClick={handleDelete}
@@ -328,7 +328,7 @@ const ScriptItem = ({ script, level, onRefresh, onView }: ScriptItemProps) => {
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                 tabIndex={0}
               >
-                {isDeleting ? 'Deleting...' : 'Delete'}
+                {isDeleting ? 'Удаление...' : 'Удалить'}
               </button>
             </div>
           </div>
@@ -376,7 +376,7 @@ const ScriptsTree = () => {
       setTree(data);
       // Keep expanded folders state after refresh
     } catch (err) {
-      setError('Failed to load scripts tree');
+      setError('Ошибка загрузки дерева скриптов');
     } finally {
       setIsLoading(false);
     }
@@ -428,7 +428,7 @@ const ScriptsTree = () => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600">Loading...</div>
+        <div className="text-gray-600">Загрузка...</div>
       </div>
     );
   }
@@ -462,21 +462,21 @@ const ScriptsTree = () => {
         }}
       >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">Scripts & Folders</h2>
+          <h2 className="text-xl font-semibold text-gray-800">Скрипты и папки</h2>
           <div className="flex gap-2">
             <button
               onClick={() => setShowCreateFolder(true)}
               className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark text-sm"
               tabIndex={0}
             >
-              + New Folder
+              + Новая папка
             </button>
             <button
               onClick={() => setShowCreateScript(true)}
               className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark text-sm"
               tabIndex={0}
             >
-              + New Script
+              + Новый скрипт
             </button>
           </div>
         </div>
@@ -504,7 +504,7 @@ const ScriptsTree = () => {
           ))}
           {tree.root_scripts.length === 0 && tree.root_folders.length === 0 && (
             <div className="p-8 text-center text-gray-500">
-              No scripts or folders yet. Create your first folder or script!
+              Пока нет скриптов или папок. Создайте первую папку или скрипт!
             </div>
           )}
         </div>

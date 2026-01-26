@@ -78,7 +78,7 @@ class ScriptsManagerService:
             if not parent:
                 raise ResourceNotFoundError(
                     ErrorCode.PARENT_FOLDER_NOT_FOUND,
-                    f"Parent folder with id {parent_id} not found",
+                    f"Родительская папка с id {parent_id} не найдена",
                     {"parent_id": str(parent_id)},
                 )
             parent_path = parent.path
@@ -94,7 +94,7 @@ class ScriptsManagerService:
         if existing.scalar_one_or_none():
             raise ConflictError(
                 ErrorCode.FOLDER_ALREADY_EXISTS,
-                f"Folder '{folder_path}' already exists",
+                f"Папка '{folder_path}' уже существует",
                 {"path": folder_path},
             )
         
@@ -163,7 +163,7 @@ class ScriptsManagerService:
                     {"error_code": ErrorCode.SCRIPT_MISSING_MAIN.value},
                 )
             raise ValidationError(
-                f"Script validation failed: {error_msg}",
+                f"Ошибка валидации скрипта: {error_msg}",
                 {"error_code": ErrorCode.INVALID_SCRIPT_CONTENT.value},
             )
         
@@ -175,7 +175,7 @@ class ScriptsManagerService:
             if not folder:
                 raise ResourceNotFoundError(
                     ErrorCode.FOLDER_NOT_FOUND,
-                    f"Folder with id {folder_id} not found",
+                    f"Папка с id {folder_id} не найдена",
                     {"folder_id": str(folder_id)},
                 )
         
@@ -192,14 +192,14 @@ class ScriptsManagerService:
             if not replace:
                 raise ConflictError(
                     ErrorCode.SCRIPT_EXISTS_REPLACE_REQUIRED,
-                    f"Script '{logical_path}' already exists. Use replace=True to replace it.",
+                    f"Скрипт '{logical_path}' уже существует. Используйте replace=True для замены.",
                     {"logical_path": logical_path, "script_id": str(existing_script.id)},
                 )
             # Check permissions for replacement
             if existing_script.created_by_id != user.id and not user.is_admin:
                 raise PermissionError(
                     ErrorCode.NOT_SCRIPT_OWNER,
-                    "You don't have permission to replace this script",
+                    "У вас нет прав для замены этого скрипта",
                     {"script_id": str(existing_script.id)},
                 )
             
@@ -310,15 +310,20 @@ class ScriptsManagerService:
         if not script:
             raise ResourceNotFoundError(
                 ErrorCode.SCRIPT_NOT_FOUND,
-                f"Script with id {script_id} not found",
+                f"Скрипт с id {script_id} не найден",
                 {"script_id": str(script_id)},
             )
         
-        # Check permissions
-        if script.created_by_id != user.id and not user.is_admin:
+        # Check permissions: user must be script owner, folder owner, or admin
+        script_owner = script.created_by_id == user.id
+        folder_owner = False
+        if script.folder:
+            folder_owner = await self._is_folder_owner_or_parent_owner(db, script.folder, user)
+        
+        if not (script_owner or folder_owner or user.is_admin):
             raise PermissionError(
                 ErrorCode.NOT_SCRIPT_OWNER,
-                "You don't have permission to edit this script",
+                "У вас нет прав для редактирования этого скрипта",
                 {"script_id": str(script_id)},
             )
         
@@ -339,7 +344,7 @@ class ScriptsManagerService:
                         {"error_code": ErrorCode.SCRIPT_MISSING_MAIN.value},
                     )
                 raise ValidationError(
-                    f"Script validation failed: {error_msg}",
+                    f"Ошибка валидации скрипта: {error_msg}",
                     {"error_code": ErrorCode.INVALID_SCRIPT_CONTENT.value},
                 )
             
@@ -351,7 +356,7 @@ class ScriptsManagerService:
         if filename is not None:
             if not filename.endswith(".py"):
                 raise ValidationError(
-                    "Script filename must have .py extension",
+                    "Имя файла скрипта должно иметь расширение .py",
                     {"filename": filename},
                 )
             
@@ -366,7 +371,7 @@ class ScriptsManagerService:
             if existing and existing.id != script_id:
                 raise ConflictError(
                     ErrorCode.SCRIPT_ALREADY_EXISTS,
-                    f"Script '{new_logical_path}' already exists",
+                    f"Скрипт '{new_logical_path}' уже существует",
                     {"logical_path": new_logical_path},
                 )
             
@@ -416,15 +421,25 @@ class ScriptsManagerService:
         if not script:
             raise ResourceNotFoundError(
                 ErrorCode.SCRIPT_NOT_FOUND,
-                f"Script with id {script_id} not found",
+                f"Скрипт с id {script_id} не найден",
                 {"script_id": str(script_id)},
             )
         
-        # Check permissions
-        if script.created_by_id != user.id and not user.is_admin:
+        # Check permissions: user must be script owner, folder owner, or admin
+        script_owner = script.created_by_id == user.id
+        folder_owner = False
+        if script.folder_id:
+            folder_result = await db.execute(
+                select(Folder).where(Folder.id == script.folder_id)
+            )
+            folder = folder_result.scalar_one_or_none()
+            if folder:
+                folder_owner = await self._is_folder_owner_or_parent_owner(db, folder, user)
+        
+        if not (script_owner or folder_owner or user.is_admin):
             raise PermissionError(
                 ErrorCode.NOT_SCRIPT_OWNER,
-                "You don't have permission to delete this script",
+                    "У вас нет прав для удаления этого скрипта",
                 {"script_id": str(script_id)},
             )
         
@@ -481,7 +496,7 @@ class ScriptsManagerService:
         if not folder:
             raise ResourceNotFoundError(
                 ErrorCode.FOLDER_NOT_FOUND,
-                f"Folder with id {folder_id} not found",
+                f"Папка с id {folder_id} не найдена",
                 {"folder_id": str(folder_id)},
             )
         
@@ -489,7 +504,7 @@ class ScriptsManagerService:
         if folder.created_by_id != user.id and not user.is_admin:
             raise PermissionError(
                 ErrorCode.NOT_FOLDER_OWNER,
-                "You don't have permission to edit this folder",
+                    "У вас нет прав для редактирования этой папки",
                 {"folder_id": str(folder_id)},
             )
         
@@ -509,7 +524,7 @@ class ScriptsManagerService:
             if existing.scalar_one_or_none():
                 raise ConflictError(
                     ErrorCode.FOLDER_ALREADY_EXISTS,
-                    f"Folder '{new_path}' already exists",
+                    f"Папка '{new_path}' уже существует",
                     {"path": new_path},
                 )
             
@@ -576,6 +591,41 @@ class ScriptsManagerService:
             new_subfolder_path: str = f"{new_base_path}/{subfolder_name}"
             await self._update_folder_path_recursive(db, subfolder, new_subfolder_path)
 
+    async def _is_folder_owner_or_parent_owner(
+        self,
+        db: AsyncSession,
+        folder: Folder,
+        user: User,
+    ) -> bool:
+        """
+        Check if user is owner of folder or any parent folder.
+        
+        Args:
+            db: Database session
+            folder: Folder to check
+            user: User to check
+            
+        Returns:
+            True if user is owner of folder or any parent folder
+        """
+        if user.is_admin:
+            return True
+        
+        # Check if user is owner of this folder
+        if folder.created_by_id == user.id:
+            return True
+        
+        # Check parent folders recursively
+        if folder.parent_id:
+            parent_result = await db.execute(
+                select(Folder).where(Folder.id == folder.parent_id)
+            )
+            parent = parent_result.scalar_one_or_none()
+            if parent:
+                return await self._is_folder_owner_or_parent_owner(db, parent, user)
+        
+        return False
+
     async def _check_folder_deletion_permissions(
         self,
         db: AsyncSession,
@@ -597,33 +647,13 @@ class ScriptsManagerService:
         if user.is_admin:
             return True, None
         
-        # Check if user is folder creator
-        if folder.created_by_id != user.id:
-            return False, f"You are not the creator of folder '{folder.name}'"
+        # Check if user is folder owner or parent folder owner
+        folder_owner = await self._is_folder_owner_or_parent_owner(db, folder, user)
+        if not folder_owner:
+            return False, f"У вас нет прав для удаления папки '{folder.name}'"
         
-        # Recursively check all subfolders
-        subfolders_result = await db.execute(
-            select(Folder).where(Folder.parent_id == folder.id)
-        )
-        subfolders: list[Folder] = list(subfolders_result.scalars().all())
-        
-        for subfolder in subfolders:
-            can_delete, error = await self._check_folder_deletion_permissions(
-                db, subfolder, user
-            )
-            if not can_delete:
-                return False, error
-        
-        # Check all scripts in folder
-        scripts_result = await db.execute(
-            select(Script).where(Script.folder_id == folder.id)
-        )
-        scripts: list[Script] = list(scripts_result.scalars().all())
-        
-        for script in scripts:
-            if script.created_by_id != user.id:
-                return False, f"You are not the creator of script '{script.filename}'"
-        
+        # If user is folder owner (or parent owner), they can delete all contents
+        # No need to check subfolders and scripts individually
         return True, None
 
     async def delete_folder(
@@ -651,7 +681,7 @@ class ScriptsManagerService:
         if not folder:
             raise ResourceNotFoundError(
                 ErrorCode.FOLDER_NOT_FOUND,
-                f"Folder with id {folder_id} not found",
+                f"Папка с id {folder_id} не найдена",
                 {"folder_id": str(folder_id)},
             )
         
@@ -660,7 +690,7 @@ class ScriptsManagerService:
         if not can_delete:
             raise PermissionError(
                 ErrorCode.NOT_ALL_OWNER,
-                error_msg or "You don't have permission to delete this folder",
+                error_msg or "У вас нет прав для удаления этой папки",
                 {"folder_id": str(folder_id)},
             )
         
@@ -804,7 +834,7 @@ class ScriptsManagerService:
                 for folder in root_folders
             ],
             "root_scripts": [
-                await self._build_script_response(script, user) for script in root_scripts
+                await self._build_script_response(script, user, db) for script in root_scripts
             ],
         }
         
@@ -848,9 +878,9 @@ class ScriptsManagerService:
         ]
         
         return {
-            "folder": await self._build_folder_response(folder, user),
+            "folder": await self._build_folder_response(folder, user, db),
             "scripts": [
-                await self._build_script_response(script, user) for script in folder_scripts
+                await self._build_script_response(script, user, db) for script in folder_scripts
             ],
             "subfolders": subfolder_items,
         }
@@ -859,6 +889,7 @@ class ScriptsManagerService:
         self,
         folder: Folder,
         user: User,
+        db: AsyncSession | None = None,
     ) -> dict[str, Any]:
         """
         Build folder response with permissions.
@@ -866,10 +897,20 @@ class ScriptsManagerService:
         Args:
             folder: Folder object
             user: Current user
+            db: Database session (optional, needed for parent owner check)
             
         Returns:
             Dictionary with folder data
         """
+        can_edit = folder.created_by_id == user.id or user.is_admin
+        can_delete = folder.created_by_id == user.id or user.is_admin
+        
+        # Check if user is owner of parent folder (if db is provided)
+        if db and not can_edit:
+            can_edit = await self._is_folder_owner_or_parent_owner(db, folder, user)
+        if db and not can_delete:
+            can_delete = await self._is_folder_owner_or_parent_owner(db, folder, user)
+        
         return {
             "id": folder.id,
             "name": folder.name,
@@ -878,14 +919,15 @@ class ScriptsManagerService:
             "created_by": {"id": folder.created_by.id, "login": folder.created_by.login},
             "created_at": folder.created_at,
             "updated_at": folder.updated_at,
-            "can_edit": folder.created_by_id == user.id or user.is_admin,
-            "can_delete": folder.created_by_id == user.id or user.is_admin,
+            "can_edit": can_edit,
+            "can_delete": can_delete,
         }
 
     async def _build_script_response(
         self,
         script: Script,
         user: User,
+        db: AsyncSession | None = None,
     ) -> dict[str, Any]:
         """
         Build script response with permissions.
@@ -893,10 +935,31 @@ class ScriptsManagerService:
         Args:
             script: Script object
             user: Current user
+            db: Database session (optional, needed for folder owner check)
             
         Returns:
             Dictionary with script data
         """
+        can_edit = script.created_by_id == user.id or user.is_admin
+        can_delete = script.created_by_id == user.id or user.is_admin
+        
+        # Check if user is owner of folder (if db is provided)
+        if db and script.folder_id and not can_edit:
+            folder_result = await db.execute(
+                select(Folder).where(Folder.id == script.folder_id)
+            )
+            folder = folder_result.scalar_one_or_none()
+            if folder:
+                can_edit = await self._is_folder_owner_or_parent_owner(db, folder, user)
+        
+        if db and script.folder_id and not can_delete:
+            folder_result = await db.execute(
+                select(Folder).where(Folder.id == script.folder_id)
+            )
+            folder = folder_result.scalar_one_or_none()
+            if folder:
+                can_delete = await self._is_folder_owner_or_parent_owner(db, folder, user)
+        
         return {
             "id": script.id,
             "filename": script.filename,
@@ -907,8 +970,8 @@ class ScriptsManagerService:
             "created_by": {"id": script.created_by.id, "login": script.created_by.login},
             "created_at": script.created_at,
             "updated_at": script.updated_at,
-            "can_edit": script.created_by_id == user.id or user.is_admin,
-            "can_delete": script.created_by_id == user.id or user.is_admin,
+            "can_edit": can_edit,
+            "can_delete": can_delete,
         }
 
     async def get_script_content(
@@ -937,7 +1000,7 @@ class ScriptsManagerService:
         if not script:
             raise ResourceNotFoundError(
                 ErrorCode.SCRIPT_NOT_FOUND,
-                f"Script with id {script_id} not found",
+                f"Скрипт с id {script_id} не найден",
                 {"script_id": str(script_id)},
             )
         
@@ -946,7 +1009,7 @@ class ScriptsManagerService:
         if not storage_path.exists():
             raise ResourceNotFoundError(
                 ErrorCode.SCRIPT_NOT_FOUND,
-                f"Script file '{script.storage_filename}' not found in filesystem",
+                f"Файл скрипта '{script.storage_filename}' не найден в файловой системе",
                 {"storage_filename": script.storage_filename, "script_id": str(script_id)},
             )
         

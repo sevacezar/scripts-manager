@@ -104,7 +104,7 @@ async def login(
         logger.warning("Login failed", login=user_data.login)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect login or password",
+            detail="Неверный логин или пароль",
             headers={"WWW-Authenticate": "Bearer"},
         )
     

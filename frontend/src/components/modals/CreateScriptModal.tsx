@@ -55,24 +55,24 @@ const CreateScriptModal = ({ folderId, onClose, onSuccess }: CreateScriptModalPr
 
     if (mode === 'file') {
       if (!file) {
-        setError('Please select a file');
+        setError('Выберите файл');
         return;
       }
     } else {
       if (!filename.trim()) {
-        setError('Please enter a filename');
+        setError('Введите имя файла');
         return;
       }
       if (!filename.endsWith('.py')) {
-        setError('Filename must end with .py');
+        setError('Имя файла должно заканчиваться на .py');
         return;
       }
       if (!content.trim()) {
-        setError('Please enter script content');
+        setError('Введите содержимое скрипта');
         return;
       }
       if (!displayName.trim()) {
-        setError('Please enter a display name');
+        setError('Введите отображаемое имя');
         return;
       }
     }
@@ -82,7 +82,7 @@ const CreateScriptModal = ({ folderId, onClose, onSuccess }: CreateScriptModalPr
     try {
       if (mode === 'file') {
         if (!file) {
-          setError('Please select a file');
+          setError('Выберите файл');
           setIsLoading(false);
           return;
         }
@@ -108,9 +108,9 @@ const CreateScriptModal = ({ folderId, onClose, onSuccess }: CreateScriptModalPr
       const apiError = err as ApiError;
       if (apiError.error_code === 'SCRIPT_EXISTS_REPLACE_REQUIRED') {
         setReplaceRequired(true);
-        setError('Script already exists. Click Create again to replace it.');
+        setError('Скрипт уже существует. Нажмите "Создать" еще раз, чтобы заменить его.');
       } else {
-        setError(apiError.message || 'Failed to create script');
+        setError(apiError.message || 'Ошибка создания скрипта');
       }
     } finally {
       setIsLoading(false);
@@ -123,7 +123,7 @@ const CreateScriptModal = ({ folderId, onClose, onSuccess }: CreateScriptModalPr
         {/* Fixed header */}
         <div className="flex-shrink-0 p-6 pb-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Create Script</h3>
+            <h3 className="text-lg font-semibold">Создать скрипт</h3>
             <button
               onClick={onClose}
               className="p-1 hover:bg-gray-100 rounded"
@@ -146,7 +146,7 @@ const CreateScriptModal = ({ folderId, onClose, onSuccess }: CreateScriptModalPr
             }`}
             tabIndex={0}
           >
-            Upload File
+            Загрузить файл
           </button>
           <button
             type="button"
@@ -158,7 +158,7 @@ const CreateScriptModal = ({ folderId, onClose, onSuccess }: CreateScriptModalPr
             }`}
             tabIndex={0}
           >
-            Write Code
+            Написать код
           </button>
           </div>
         </div>
@@ -180,7 +180,7 @@ const CreateScriptModal = ({ folderId, onClose, onSuccess }: CreateScriptModalPr
           {mode === 'file' ? (
             <div className="mb-4">
               <label htmlFor="scriptFile" className="block text-sm font-medium text-gray-700 mb-2">
-                Python File (.py)
+                Python файл (.py)
               </label>
               <input
                 id="scriptFile"
@@ -196,7 +196,7 @@ const CreateScriptModal = ({ folderId, onClose, onSuccess }: CreateScriptModalPr
             <>
               <div className="mb-4">
                 <label htmlFor="filename" className="block text-sm font-medium text-gray-700 mb-2">
-                  Filename <span className="text-red-500">*</span>
+                  Имя файла <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="filename"
@@ -208,11 +208,11 @@ const CreateScriptModal = ({ folderId, onClose, onSuccess }: CreateScriptModalPr
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
                   aria-label="Filename input"
                 />
-                <p className="mt-1 text-xs text-gray-500">Must end with .py</p>
+                <p className="mt-1 text-xs text-gray-500">Должно заканчиваться на .py</p>
               </div>
               <div className="mb-4">
                 <label htmlFor="scriptContent" className="block text-sm font-medium text-gray-700 mb-2">
-                  Script Content <span className="text-red-500">*</span>
+                  Содержимое скрипта <span className="text-red-500">*</span>
                 </label>
               <textarea
                 id="scriptContent"
@@ -240,7 +240,7 @@ const CreateScriptModal = ({ folderId, onClose, onSuccess }: CreateScriptModalPr
                 aria-label="Script content input"
               />
                 <p className="mt-1 text-xs text-gray-500">
-                  Script must contain a function <code className="bg-gray-100 px-1 rounded">main(data: dict) -&gt; dict</code>
+                  Скрипт должен содержать функцию <code className="bg-gray-100 px-1 rounded">main(data: dict) -&gt; dict</code>
                 </p>
               </div>
             </>
@@ -248,7 +248,7 @@ const CreateScriptModal = ({ folderId, onClose, onSuccess }: CreateScriptModalPr
 
           <div className="mb-4">
             <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-2">
-              Display Name <span className="text-red-500">*</span>
+              Отображаемое имя <span className="text-red-500">*</span>
             </label>
             <input
               id="displayName"
@@ -263,7 +263,7 @@ const CreateScriptModal = ({ folderId, onClose, onSuccess }: CreateScriptModalPr
 
           <div className="mb-4">
             <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-              Description (optional)
+              Описание (необязательно)
             </label>
             <textarea
               id="description"
@@ -286,7 +286,7 @@ const CreateScriptModal = ({ folderId, onClose, onSuccess }: CreateScriptModalPr
               className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
               tabIndex={0}
             >
-              Cancel
+              Отмена
             </button>
             <button
               type="submit"
@@ -295,7 +295,7 @@ const CreateScriptModal = ({ folderId, onClose, onSuccess }: CreateScriptModalPr
               className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark disabled:opacity-50"
               tabIndex={0}
             >
-              {isLoading ? 'Creating...' : replaceRequired ? 'Replace' : 'Create'}
+              {isLoading ? 'Создание...' : replaceRequired ? 'Заменить' : 'Создать'}
             </button>
           </div>
         </div>

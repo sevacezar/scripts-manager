@@ -32,7 +32,7 @@ const CreateFolderModal = ({ parentId, onClose, onSuccess }: CreateFolderModalPr
       onSuccess();
     } catch (err) {
       const apiError = err as ApiError;
-      setError(apiError.message || 'Failed to create folder');
+      setError(apiError.message || 'Ошибка создания папки');
     } finally {
       setIsLoading(false);
     }
@@ -42,7 +42,7 @@ const CreateFolderModal = ({ parentId, onClose, onSuccess }: CreateFolderModalPr
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Create Folder</h3>
+          <h3 className="text-lg font-semibold">Создать папку</h3>
           <button
             onClick={onClose}
             className="p-1 hover:bg-gray-100 rounded"
@@ -62,7 +62,7 @@ const CreateFolderModal = ({ parentId, onClose, onSuccess }: CreateFolderModalPr
 
           <div className="mb-4">
             <label htmlFor="folderName" className="block text-sm font-medium text-gray-700 mb-2">
-              Folder Name
+              Название папки
             </label>
             <input
               ref={inputRef}
@@ -84,7 +84,7 @@ const CreateFolderModal = ({ parentId, onClose, onSuccess }: CreateFolderModalPr
               className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
               tabIndex={0}
             >
-              Cancel
+              Отмена
             </button>
             <button
               type="submit"
@@ -92,7 +92,7 @@ const CreateFolderModal = ({ parentId, onClose, onSuccess }: CreateFolderModalPr
               className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark disabled:opacity-50"
               tabIndex={0}
             >
-              {isLoading ? 'Creating...' : 'Create'}
+              {isLoading ? 'Создание...' : 'Создать'}
             </button>
           </div>
         </form>

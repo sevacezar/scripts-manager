@@ -21,14 +21,14 @@ const Register = () => {
       return null; // Don't show error for empty field
     }
     if (value.length < 3) {
-      return 'Login must be at least 3 characters';
+      return 'Логин должен содержать не менее 3 символов';
     }
     if (value.length > 50) {
-      return 'Login must be no more than 50 characters';
+      return 'Логин должен содержать не более 50 символов';
     }
     const loginRegex = /^[a-zA-Z0-9_-]+$/;
     if (!loginRegex.test(value)) {
-      return 'Login can only contain letters, numbers, "-" and "_"';
+      return 'Логин может содержать только буквы, цифры, "-" и "_"';
     }
     return null;
   };
@@ -39,7 +39,7 @@ const Register = () => {
       return null; // Don't show error for empty field
     }
     if (value.length < 8) {
-      return 'Password must be at least 8 characters';
+      return 'Пароль должен содержать не менее 8 символов';
     }
     return null;
   };
@@ -60,7 +60,7 @@ const Register = () => {
     // Re-validate confirm password if it's already filled
     if (confirmPassword) {
       setConfirmPasswordError(
-        value !== confirmPassword ? 'Passwords do not match' : null
+        value !== confirmPassword ? 'Пароли не совпадают' : null
       );
     }
   };
@@ -101,14 +101,16 @@ const Register = () => {
       navigate('/login');
     } catch (err) {
       const apiError = err as ApiError;
-      const errorMessage = apiError.message || 'Registration failed';
+      const errorMessage = apiError.message || 'Ошибка регистрации';
       
       // Check if user already exists (various possible error messages)
       const lowerMessage = errorMessage.toLowerCase();
       if (lowerMessage.includes('already exists') || 
           lowerMessage.includes('user with login') ||
-          lowerMessage.includes('already exist')) {
-        setError(`User with login "${login}" already exists. Please choose a different login.`);
+          lowerMessage.includes('already exist') ||
+          lowerMessage.includes('уже существует') ||
+          lowerMessage.includes('пользователь с логином')) {
+        setError(`Пользователь с логином "${login}" уже существует. Выберите другой логин.`);
       } else {
         setError(errorMessage);
       }
@@ -121,7 +123,7 @@ const Register = () => {
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-lg">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-primary">
-            Create your account
+            Создание аккаунта
           </h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -133,7 +135,7 @@ const Register = () => {
           <div className="space-y-4">
             <div>
               <label htmlFor="login" className="block text-sm font-medium text-gray-700">
-                Login
+                Логин
               </label>
               <input
                 id="login"
@@ -155,12 +157,12 @@ const Register = () => {
                 </p>
               )}
               <p id="login-help" className="mt-1 text-xs text-gray-500">
-                Login must be 3-50 characters and can only contain letters, numbers, "-" and "_"
+                Логин должен содержать 3-50 символов и может содержать только буквы, цифры, "-" и "_"
               </p>
             </div>
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
+                Пароль
               </label>
               <input
                 id="password"
@@ -182,12 +184,12 @@ const Register = () => {
                 </p>
               )}
               <p id="password-help" className="mt-1 text-xs text-gray-500">
-                Password must be at least 8 characters long
+                Пароль должен содержать не менее 8 символов
               </p>
             </div>
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                Confirm Password
+                Подтверждение пароля
               </label>
               <input
                 id="confirmPassword"
@@ -218,18 +220,18 @@ const Register = () => {
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Register button"
             >
-              {isLoading ? 'Creating account...' : 'Register'}
+              {isLoading ? 'Создание аккаунта...' : 'Зарегистрироваться'}
             </button>
           </div>
           <div className="text-center">
             <p className="text-sm text-gray-600">
-              Already have an account?{' '}
+              Уже есть аккаунт?{' '}
               <Link
                 to="/login"
                 className="font-medium text-primary hover:text-primary-dark"
                 tabIndex={0}
               >
-                Sign in
+                Войти
               </Link>
             </p>
           </div>

@@ -51,7 +51,7 @@ def handle_error(error: Exception, context: str = "") -> HTTPException:
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail={
             "error_code": "INTERNAL_ERROR",
-            "message": "An unexpected error occurred",
+            "message": "Произошла непредвиденная ошибка",
         },
     )
 
@@ -158,10 +158,18 @@ async def get_folder(
     if not folder:
         raise create_error_response(
             ErrorCode.FOLDER_NOT_FOUND,
-            f"Folder with id {folder_id} not found",
+            f"Папка с id {folder_id} не найдена",
             status.HTTP_404_NOT_FOUND,
             {"folder_id": str(folder_id)},
         )
+    
+    # Check if user is folder owner or parent folder owner
+    can_edit = folder.created_by_id == current_user.id or current_user.is_admin
+    can_delete = folder.created_by_id == current_user.id or current_user.is_admin
+    if not can_edit:
+        can_edit = await scripts_service._is_folder_owner_or_parent_owner(db, folder, current_user)
+    if not can_delete:
+        can_delete = await scripts_service._is_folder_owner_or_parent_owner(db, folder, current_user)
     
     return FolderResponse(
         id=folder.id,
@@ -171,8 +179,8 @@ async def get_folder(
         created_by={"id": folder.created_by.id, "login": folder.created_by.login},
         created_at=folder.created_at,
         updated_at=folder.updated_at,
-        can_edit=folder.created_by_id == current_user.id or current_user.is_admin,
-        can_delete=folder.created_by_id == current_user.id or current_user.is_admin,
+        can_edit=can_edit,
+        can_delete=can_delete,
     )
 
 
@@ -231,6 +239,14 @@ async def update_folder(
         created_by_id: int = folder.created_by.id
         created_by_login: str = folder.created_by.login
         
+        # Check if user is folder owner or parent folder owner
+        can_edit = folder_created_by_id == current_user.id or current_user.is_admin
+        can_delete = folder_created_by_id == current_user.id or current_user.is_admin
+        if not can_edit:
+            can_edit = await scripts_service._is_folder_owner_or_parent_owner(db, folder, current_user)
+        if not can_delete:
+            can_delete = await scripts_service._is_folder_owner_or_parent_owner(db, folder, current_user)
+        
         return FolderResponse(
             id=folder_id_val,
             name=folder_name,
@@ -239,8 +255,8 @@ async def update_folder(
             created_by={"id": created_by_id, "login": created_by_login},
             created_at=folder_created_at,
             updated_at=folder_updated_at,
-            can_edit=folder_created_by_id == current_user.id or current_user.is_admin,
-            can_delete=folder_created_by_id == current_user.id or current_user.is_admin,
+            can_edit=can_edit,
+            can_delete=can_delete,
         )
         
     except Exception as e:
@@ -330,14 +346,14 @@ async def create_script(
     if not file.filename:
         raise create_error_response(
             ErrorCode.VALIDATION_ERROR,
-            "Filename is required",
+            "Имя файла обязательно",
             status.HTTP_400_BAD_REQUEST,
         )
     
     if not file.filename.endswith(".py"):
         raise create_error_response(
             ErrorCode.INVALID_FILENAME,
-            "File must have .py extension",
+            "Файл должен иметь расширение .py",
             status.HTTP_400_BAD_REQUEST,
             {"filename": file.filename},
         )
@@ -440,7 +456,7 @@ async def create_script_from_text(
     if len(filename) < 4 or len(filename) > 255:
         raise create_error_response(
             ErrorCode.VALIDATION_ERROR,
-            "Filename must be between 4 and 255 characters",
+            "Имя файла должно содержать от 4 до 255 символов",
             status.HTTP_400_BAD_REQUEST,
             {"filename": filename},
         )
@@ -449,7 +465,7 @@ async def create_script_from_text(
     if not content or not content.strip():
         raise create_error_response(
             ErrorCode.VALIDATION_ERROR,
-            "Script content cannot be empty",
+            "Содержимое скрипта не может быть пустым",
             status.HTTP_400_BAD_REQUEST,
         )
     
@@ -535,10 +551,30 @@ async def get_script(
     if not script:
         raise create_error_response(
             ErrorCode.SCRIPT_NOT_FOUND,
-            f"Script with id {script_id} not found",
+            f"Скрипт с id {script_id} не найден",
             status.HTTP_404_NOT_FOUND,
             {"script_id": str(script_id)},
         )
+    
+    # Check if user is script owner or folder owner
+    can_edit = script.created_by_id == current_user.id or current_user.is_admin
+    can_delete = script.created_by_id == current_user.id or current_user.is_admin
+    if script.folder_id and not can_edit:
+        from src.scripts_manager.models import Folder
+        folder_result = await db.execute(
+            select(Folder).where(Folder.id == script.folder_id)
+        )
+        folder = folder_result.scalar_one_or_none()
+        if folder:
+            can_edit = await scripts_service._is_folder_owner_or_parent_owner(db, folder, current_user)
+    if script.folder_id and not can_delete:
+        from src.scripts_manager.models import Folder
+        folder_result = await db.execute(
+            select(Folder).where(Folder.id == script.folder_id)
+        )
+        folder = folder_result.scalar_one_or_none()
+        if folder:
+            can_delete = await scripts_service._is_folder_owner_or_parent_owner(db, folder, current_user)
     
     return ScriptResponse(
         id=script.id,
@@ -550,8 +586,8 @@ async def get_script(
         created_by={"id": script.created_by.id, "login": script.created_by.login},
         created_at=script.created_at,
         updated_at=script.updated_at,
-        can_edit=script.created_by_id == current_user.id or current_user.is_admin,
-        can_delete=script.created_by_id == current_user.id or current_user.is_admin,
+        can_edit=can_edit,
+        can_delete=can_delete,
     )
 
 
@@ -656,6 +692,26 @@ async def update_script(
         created_by_id: int = script.created_by.id
         created_by_login: str = script.created_by.login
         
+        # Check if user is script owner or folder owner
+        from sqlalchemy import select
+        from src.scripts_manager.models import Folder
+        can_edit = script_created_by_id == current_user.id or current_user.is_admin
+        can_delete = script_created_by_id == current_user.id or current_user.is_admin
+        if script_folder_id and not can_edit:
+            folder_result = await db.execute(
+                select(Folder).where(Folder.id == script_folder_id)
+            )
+            folder = folder_result.scalar_one_or_none()
+            if folder:
+                can_edit = await scripts_service._is_folder_owner_or_parent_owner(db, folder, current_user)
+        if script_folder_id and not can_delete:
+            folder_result = await db.execute(
+                select(Folder).where(Folder.id == script_folder_id)
+            )
+            folder = folder_result.scalar_one_or_none()
+            if folder:
+                can_delete = await scripts_service._is_folder_owner_or_parent_owner(db, folder, current_user)
+        
         return ScriptResponse(
             id=script_id_val,
             filename=script_filename,
@@ -666,8 +722,8 @@ async def update_script(
             created_by={"id": created_by_id, "login": created_by_login},
             created_at=script_created_at,
             updated_at=script_updated_at,
-            can_edit=script_created_by_id == current_user.id or current_user.is_admin,
-            can_delete=script_created_by_id == current_user.id or current_user.is_admin,
+            can_edit=can_edit,
+            can_delete=can_delete,
         )
         
     except Exception as e:

@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import type { Script, ApiError } from '../../types/api';
@@ -15,12 +15,22 @@ const EditScriptModal = ({ script, onClose, onSuccess }: EditScriptModalProps) =
   const [filename, setFilename] = useState(script.filename);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const displayNameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setDisplayName(script.display_name);
     setDescription(script.description || '');
     setFilename(script.filename);
   }, [script]);
+
+  useEffect(() => {
+    // Focus on first input and move cursor to end when modal opens
+    if (displayNameRef.current) {
+      displayNameRef.current.focus();
+      const length = displayNameRef.current.value.length;
+      displayNameRef.current.setSelectionRange(length, length);
+    }
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -36,7 +46,7 @@ const EditScriptModal = ({ script, onClose, onSuccess }: EditScriptModalProps) =
       onSuccess();
     } catch (err) {
       const apiError = err as ApiError;
-      setError(apiError.message || 'Failed to update script');
+      setError(apiError.message || 'Ошибка обновления скрипта');
     } finally {
       setIsLoading(false);
     }
@@ -46,7 +56,7 @@ const EditScriptModal = ({ script, onClose, onSuccess }: EditScriptModalProps) =
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Edit Script</h3>
+          <h3 className="text-lg font-semibold">Редактировать скрипт</h3>
           <button
             onClick={onClose}
             className="p-1 hover:bg-gray-100 rounded"
@@ -66,9 +76,10 @@ const EditScriptModal = ({ script, onClose, onSuccess }: EditScriptModalProps) =
 
           <div className="mb-4">
             <label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-2">
-              Display Name
+              Отображаемое имя
             </label>
             <input
+              ref={displayNameRef}
               id="displayName"
               type="text"
               required
@@ -82,7 +93,7 @@ const EditScriptModal = ({ script, onClose, onSuccess }: EditScriptModalProps) =
 
           <div className="mb-4">
             <label htmlFor="filename" className="block text-sm font-medium text-gray-700 mb-2">
-              Filename
+              Имя файла
             </label>
             <input
               id="filename"
@@ -94,12 +105,12 @@ const EditScriptModal = ({ script, onClose, onSuccess }: EditScriptModalProps) =
               tabIndex={0}
               aria-label="Filename input"
             />
-            <p className="text-xs text-gray-500 mt-1">Must have .py extension</p>
+            <p className="text-xs text-gray-500 mt-1">Должно иметь расширение .py</p>
           </div>
 
           <div className="mb-4">
             <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-              Description (optional)
+              Описание (необязательно)
             </label>
             <textarea
               id="description"
@@ -119,7 +130,7 @@ const EditScriptModal = ({ script, onClose, onSuccess }: EditScriptModalProps) =
               className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
               tabIndex={0}
             >
-              Cancel
+              Отмена
             </button>
             <button
               type="submit"
@@ -127,7 +138,7 @@ const EditScriptModal = ({ script, onClose, onSuccess }: EditScriptModalProps) =
               className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark disabled:opacity-50"
               tabIndex={0}
             >
-              {isLoading ? 'Saving...' : 'Save'}
+              {isLoading ? 'Сохранение...' : 'Сохранить'}
             </button>
           </div>
         </form>

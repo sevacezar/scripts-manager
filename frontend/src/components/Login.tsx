@@ -19,7 +19,7 @@ const Login = () => {
       await handleLogin({ login, password });
     } catch (err) {
       const apiError = err as ApiError;
-      setError(apiError.message || 'Login failed');
+      setError(apiError.message || 'Ошибка входа');
     } finally {
       setIsLoading(false);
     }
@@ -30,7 +30,7 @@ const Login = () => {
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-lg">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-primary">
-            Sign in to Scripts Manager
+            Вход в Менеджер скриптов
           </h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -42,7 +42,7 @@ const Login = () => {
           <div className="space-y-4">
             <div>
               <label htmlFor="login" className="block text-sm font-medium text-gray-700">
-                Login
+                Логин
               </label>
               <input
                 id="login"
@@ -57,7 +57,7 @@ const Login = () => {
             </div>
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
+                Пароль
               </label>
               <input
                 id="password"
@@ -79,18 +79,18 @@ const Login = () => {
               className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Sign in button"
             >
-              {isLoading ? 'Signing in...' : 'Sign in'}
+              {isLoading ? 'Вход...' : 'Войти'}
             </button>
           </div>
           <div className="text-center">
             <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
+              Нет аккаунта?{' '}
               <Link
                 to="/register"
                 className="font-medium text-primary hover:text-primary-dark"
                 tabIndex={0}
               >
-                Register
+                Зарегистрироваться
               </Link>
             </p>
           </div>
