@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.1",
+    "@codemirror/lang-json": "^6.0.2",
     "@codemirror/lang-python": "^6.2.1",
     "@codemirror/view": "^6.39.11",
     "@types/react-syntax-highlighter": "^15.5.13",

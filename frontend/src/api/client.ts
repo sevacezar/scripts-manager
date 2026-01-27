@@ -12,6 +12,8 @@ import type {
   CreateScriptFromTextRequest,
   UpdateScriptRequest,
   ApiError,
+  ScriptExecutionRequest,
+  ScriptExecutionResponse,
 } from '../types/api';
 
 const API_BASE_URL = '/api/v1';
@@ -254,6 +256,16 @@ class ApiClient {
 
   async createScriptFromText(data: CreateScriptFromTextRequest): Promise<Script> {
     return this.request<Script>('/scripts-manager/scripts-from-text', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async executeScript(
+    scriptPath: string,
+    data: Record<string, unknown>
+  ): Promise<ScriptExecutionResponse> {
+    return this.request<ScriptExecutionResponse>(`/scripts/${scriptPath}`, {
       method: 'POST',
       body: JSON.stringify(data),
     });

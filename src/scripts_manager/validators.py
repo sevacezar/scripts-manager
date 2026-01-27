@@ -46,7 +46,7 @@ def is_service_file(path: Path) -> bool:
 
 def validate_script_content(content: str) -> tuple[bool, str | None]:
     """
-    Validate script content - check for main function.
+    Validate script content - check for main function with one dict argument.
     
     Args:
         content: Script content as string
@@ -59,22 +59,55 @@ def validate_script_content(content: str) -> tuple[bool, str | None]:
         tree: ast.Module = ast.parse(content)
         
         # Search for main function
-        has_main: bool = False
+        main_function = None
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef) and node.name == "main":
-                has_main = True
-                # Optional: check signature
-                # For now, just check existence
+                main_function = node
                 break
         
-        if not has_main:
-            return False, "Script must contain a 'main(data: dict) -> dict' function"
+        if not main_function:
+            return False, "Скрипт должен содержать функцию 'main' с одним аргументом типа dict"
+        
+        # Check that main has exactly one argument
+        args = main_function.args.args
+        if len(args) != 1:
+            return False, "Функция 'main' должна принимать ровно один аргумент типа dict"
+        
+        # Check that the argument has type annotation (dict or Dict)
+        arg = args[0]
+        if arg.annotation:
+            # Check if annotation is dict or Dict
+            is_dict_type = False
+            if isinstance(arg.annotation, ast.Name):
+                # dict or Dict
+                is_dict_type = arg.annotation.id in ('dict', 'Dict')
+            elif isinstance(arg.annotation, ast.Subscript):
+                # dict[...] or Dict[...]
+                if isinstance(arg.annotation.value, ast.Name):
+                    is_dict_type = arg.annotation.value.id in ('dict', 'Dict')
+            
+            if not is_dict_type:
+                return False, "Аргумент функции 'main' должен иметь тип dict"
         
         return True, None
         
     except SyntaxError as e:
-        return False, f"Invalid Python syntax: {str(e)}"
+        # Format syntax error message with line number and details
+        error_msg = "Неверный синтаксис Python"
+        if e.lineno:
+            error_msg += f" на строке {e.lineno}"
+        if e.offset:
+            error_msg += f", позиция {e.offset}"
+        if e.text:
+            error_msg += f":\n{e.text.rstrip()}"
+            if e.offset:
+                # Add caret indicator pointing to the error position
+                indent = ' ' * (e.offset - 1)
+                error_msg += f"\n{indent}^"
+        if e.msg:
+            error_msg += f"\n{e.msg}"
+        return False, error_msg
     except Exception as e:
         logger.error("Script validation error", error=str(e))
-        return False, f"Validation error: {str(e)}"
+        return False, f"Ошибка валидации: {str(e)}"
 

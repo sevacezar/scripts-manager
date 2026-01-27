@@ -16,9 +16,9 @@ def main(data: dict) -> dict:
     
     # Process data
     result: dict = {
-        "message": f"Hello, {name}!",
-        "processed_value": value * 2,
-        "received_data": data,
+        "message": f"Hello, мистер {name}!",
+        "processed_value": value * 10,
+        "received_dataы": data,
     }
     
     return result

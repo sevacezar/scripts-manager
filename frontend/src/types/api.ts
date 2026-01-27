@@ -98,4 +98,15 @@ export interface ApiError {
   details?: Record<string, unknown>;
 }
 
+export interface ScriptExecutionRequest {
+  data: Record<string, unknown>;
+}
+
+export interface ScriptExecutionResponse {
+  success: boolean;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  execution_time: number;
+}
+
 

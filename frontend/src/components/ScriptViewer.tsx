@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Sun, Moon, Edit2, Save, XCircle } from 'lucide-react';
+import { X, Sun, Moon, Edit2, Save, XCircle, Play } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
+import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { keymap } from '@codemirror/view';
 import { EditorView } from '@codemirror/view';
-import { Transaction } from '@codemirror/state';
 import { apiClient } from '../api/client';
 import type { Script, ApiError } from '../types/api';
 
@@ -36,6 +36,10 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
   const [showExpandButton, setShowExpandButton] = useState(false);
   const [isDescriptionLong, setIsDescriptionLong] = useState(false);
   const descriptionRef = useRef<HTMLParagraphElement>(null);
+  const [isExecutionPanelOpen, setIsExecutionPanelOpen] = useState(false);
+  const [executionRequestData, setExecutionRequestData] = useState<string>('{\n  \n}');
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [fullResponse, setFullResponse] = useState<Record<string, unknown> | null>(null);
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
@@ -163,17 +167,69 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
     }
   };
 
+  const handleOpenExecutionPanel = () => {
+    setIsExecutionPanelOpen(true);
+    setFullResponse(null);
+  };
+
+  const handleCloseExecutionPanel = () => {
+    setIsExecutionPanelOpen(false);
+    setFullResponse(null);
+  };
+
+  const handleExecuteScript = async () => {
+    setIsExecuting(true);
+    setFullResponse(null);
+
+    try {
+      // Parse JSON request data
+      let parsedData: Record<string, unknown>;
+      try {
+        parsedData = JSON.parse(executionRequestData);
+      } catch (parseError) {
+        const parseErrorResponse = {
+          error: 'Ошибка парсинга JSON',
+          message: 'Проверьте формат данных',
+          details: String(parseError),
+        };
+        setFullResponse(parseErrorResponse);
+        setIsExecuting(false);
+        return;
+      }
+
+      // Send parsed data directly - backend accepts any JSON body
+      const result = await apiClient.executeScript(script.logical_path, parsedData as Record<string, unknown>);
+
+      // Store full response for display
+      setFullResponse(result as unknown as Record<string, unknown>);
+    } catch (err) {
+      const apiError = err as ApiError;
+      // Create error response object
+      const errorResponse: Record<string, unknown> = {
+        success: false,
+        error: 'Ошибка выполнения скрипта',
+        message: apiError.message || 'Неизвестная ошибка',
+        error_code: apiError.error_code || 'UNKNOWN_ERROR',
+        details: apiError.details || undefined,
+      };
+      
+      setFullResponse(errorResponse);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
   return (
     <div className="h-full border-l border-gray-200 bg-white flex flex-col">
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold text-gray-800">{script.filename}</h3>
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 min-w-0">
+        <div className="flex-1 min-w-0 pr-4">
+          <div className="flex items-center gap-2 min-w-0">
+            <h3 className="text-lg font-semibold text-gray-800 truncate">{script.filename}</h3>
             {script.display_name !== script.filename && (
-              <span className="text-sm text-gray-500 italic">({script.display_name})</span>
+              <span className="text-sm text-gray-500 italic whitespace-nowrap flex-shrink-0">({script.display_name})</span>
             )}
           </div>
-          <p className="text-sm text-gray-500 mt-1">{script.logical_path}</p>
+          <p className="text-sm text-gray-500 mt-1 truncate">{script.logical_path}</p>
           {script.description && (
             <div className="mt-1">
               <p
@@ -197,7 +253,18 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {!isEditing && (
+            <button
+              onClick={handleOpenExecutionPanel}
+              className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1.5"
+              tabIndex={0}
+              aria-label="Выполнить скрипт"
+            >
+              <Play className="w-4 h-4" />
+              Выполнить
+            </button>
+          )}
           {!isEditing && script.can_edit && (
             <button
               onClick={handleStartEdit}
@@ -361,6 +428,112 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
           </>
         )}
       </div>
+
+      {isExecutionPanelOpen && (
+        <div className="border-t border-gray-200 bg-white flex flex-col" style={{ height: '400px' }}>
+          <div className="flex items-center justify-between p-3 border-b border-gray-200 flex-shrink-0">
+            <h4 className="text-md font-semibold text-gray-800">Выполнение скрипта</h4>
+            <button
+              onClick={handleCloseExecutionPanel}
+              className="p-1 hover:bg-gray-100 rounded"
+              tabIndex={0}
+              aria-label="Закрыть панель выполнения"
+            >
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+          
+          <div className="flex-1 flex gap-4 p-4 min-h-0">
+            {/* JSON Editor */}
+            <div className="flex-1 flex flex-col min-w-0">
+              <div className="mb-2">
+                <label className="text-sm font-medium text-gray-700">Тело запроса (JSON)</label>
+              </div>
+              <div className="flex-1 border border-gray-300 rounded overflow-hidden min-h-0">
+                <CodeMirror
+                  value={executionRequestData}
+                  height="100%"
+                  extensions={[json()]}
+                  theme={theme === 'dark' ? oneDark : undefined}
+                  onChange={(value) => {
+                    setExecutionRequestData(value);
+                  }}
+                  basicSetup={{
+                    lineNumbers: true,
+                    foldGutter: true,
+                    dropCursor: false,
+                    allowMultipleSelections: false,
+                  }}
+                  style={{
+                    fontSize: '0.875rem',
+                    height: '100%',
+                  }}
+                />
+              </div>
+              <div className="mt-3 flex justify-end">
+                <button
+                  onClick={handleExecuteScript}
+                  disabled={isExecuting}
+                  className="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  tabIndex={0}
+                  aria-label="Отправить запрос"
+                >
+                  <Play className="w-4 h-4" />
+                  {isExecuting ? 'Выполнение...' : 'Отправить'}
+                </button>
+              </div>
+            </div>
+
+            {/* Results */}
+            <div className="flex-1 flex flex-col min-w-0">
+              <div className="mb-2">
+                <label className="text-sm font-medium text-gray-700">Результат выполнения</label>
+              </div>
+              <div className="flex-1 border border-gray-300 rounded overflow-auto min-h-0 bg-gray-50">
+                {isExecuting && (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-gray-600">Выполнение скрипта...</div>
+                  </div>
+                )}
+                
+                {!isExecuting && fullResponse && (
+                  <div className="p-4">
+                    <div className="mb-3">
+                      {fullResponse.success !== undefined && (
+                        <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                          fullResponse.success === true
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {fullResponse.success === true ? 'Успешно' : 'Ошибка'}
+                        </span>
+                      )}
+                      {fullResponse.execution_time !== undefined && typeof fullResponse.execution_time === 'number' && (
+                        <span className="ml-3 text-xs text-gray-500">
+                          Время выполнения: {fullResponse.execution_time.toFixed(3)}с
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <div className="text-sm font-semibold text-gray-700 mb-2">Полный ответ:</div>
+                      <pre className="text-sm text-gray-800 bg-white p-3 rounded border border-gray-200 overflow-auto">
+                        {JSON.stringify(fullResponse, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+                
+                {!isExecuting && !fullResponse && (
+                  <div className="flex items-center justify-center h-full text-gray-400">
+                    <div>Нажмите "Отправить" для выполнения скрипта</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

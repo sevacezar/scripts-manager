@@ -2,15 +2,14 @@
 
 import time
 
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Any
+
+from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
 from src.logger import get_logger
-from src.script_executor.schemas import (
-    ScriptExecutionRequest,
-    ScriptExecutionResponse,
-)
+from src.script_executor.schemas import ScriptExecutionResponse
 from src.script_executor.service import ScriptExecutionError, ScriptExecutorService
 
 
@@ -27,13 +26,13 @@ script_executor: ScriptExecutorService = ScriptExecutorService()
     summary="Execute Python script",
     description=(
         "Execute a Python script from the scripts directory. "
-        "Script must contain a 'main(data: dict) -> dict' function. "
-        "Receives JSON in request body, returns JSON in response."
+        "Script must contain a 'main' function with one dict argument. "
+        "Accepts any JSON body (or empty), returns JSON in response."
     ),
 )
 async def execute_script(
     script_path: str,
-    request: ScriptExecutionRequest,
+    data: dict[str, Any] = Body(default_factory=dict),
     db: AsyncSession = Depends(get_db),
 ) -> ScriptExecutionResponse:
     """
@@ -41,8 +40,8 @@ async def execute_script(
     
     Script requirements:
     - Must be a single .py file
-    - Must contain a function: def main(data: dict) -> dict
-    - Function receives JSON data as dict
+    - Must contain a function: def main(arg: dict) -> dict (argument name can be any)
+    - Function receives JSON body as dict
     - Function must return a dict (or None, which becomes empty dict)
     
     Example script:
@@ -54,7 +53,7 @@ async def execute_script(
     
     Args:
         script_path: Logical path to script (e.g., "geology/test.py")
-        request: ScriptExecutionRequest with data dict
+        data: JSON body (any structure, defaults to empty dict)
         db: Database session
         
     Returns:
@@ -70,7 +69,7 @@ async def execute_script(
         result: dict = await script_executor.execute_script(
             db=db,
             logical_path=script_path,
-            data=request.data,
+            data=data,
         )
         
         execution_time: float = time.time() - start_time
