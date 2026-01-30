@@ -9,6 +9,7 @@ import { json } from '@codemirror/lang-json';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { keymap } from '@codemirror/view';
 import { EditorView } from '@codemirror/view';
+import { EditorSelection } from '@codemirror/state';
 import { apiClient } from '../api/client';
 import type { Script, ApiError } from '../types/api';
 
@@ -34,7 +35,6 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
   });
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [showExpandButton, setShowExpandButton] = useState(false);
-  const [isDescriptionLong, setIsDescriptionLong] = useState(false);
   const descriptionRef = useRef<HTMLParagraphElement>(null);
   const [isExecutionPanelOpen, setIsExecutionPanelOpen] = useState(false);
   const [executionRequestData, setExecutionRequestData] = useState<string>('{\n  \n}');
@@ -91,12 +91,10 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
         
         // Check if description is longer than 3 lines
         const isLong = fullHeight > clampedHeight;
-        setIsDescriptionLong(isLong);
         
         // Show button if description is long (either to expand or collapse)
         setShowExpandButton(isLong);
       } else {
-        setIsDescriptionLong(false);
         setShowExpandButton(false);
       }
     }, 0);
@@ -116,11 +114,6 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
   const handleCancelEdit = () => {
     setIsEditing(false);
     setContent(originalContent);
-    setSaveError(null);
-  };
-
-  const handleContentChange = (value: string) => {
-    setContent(value);
     setSaveError(null);
   };
 
@@ -334,7 +327,7 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
                             const transaction = state.changeByRange((range) => {
                               return {
                                 changes: { from: range.from, insert: '    ' },
-                                range: { from: range.from + 4, to: range.from + 4 },
+                                range: EditorSelection.range(range.from + 4, range.from + 4),
                               };
                             });
                             view.dispatch(transaction);
@@ -355,7 +348,6 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
                       allowMultipleSelections: false,
                       indentOnInput: false,
                       tabSize: 4,
-                      indentUnit: 4,
                     }}
                     style={{
                       fontSize: '0.875rem',

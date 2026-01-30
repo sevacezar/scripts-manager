@@ -12,7 +12,6 @@ import type {
   CreateScriptFromTextRequest,
   UpdateScriptRequest,
   ApiError,
-  ScriptExecutionRequest,
   ScriptExecutionResponse,
 } from '../types/api';
 
