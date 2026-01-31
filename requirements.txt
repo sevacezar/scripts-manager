@@ -90,7 +90,7 @@ typing-inspection==0.4.2
     #   pydantic-settings
 uvicorn==0.40.0
     # via scripts-manager (pyproject.toml)
-uvloop==0.22.1
+# uvloop==0.22.1
     # via uvicorn
 watchfiles==1.1.1
     # via uvicorn
