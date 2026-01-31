@@ -89,7 +89,7 @@ def execute_script(
 
 # Пример использования
 # Параметры подключения
-host = 'localhost'
+host = '10.7.115.8'
 port = 8000
 script_path = 'test/test.py'
 
