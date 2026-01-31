@@ -253,6 +253,7 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
               className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1.5"
               tabIndex={0}
               aria-label="Выполнить скрипт"
+              data-onboarding="execute-script"
             >
               <Play className="w-4 h-4" />
               Выполнить
@@ -264,6 +265,7 @@ const ScriptViewer = ({ script, onClose, onScriptUpdated }: ScriptViewerProps) =
               className="px-3 py-1.5 text-sm bg-primary text-white rounded hover:bg-primary-dark flex items-center gap-1.5"
               tabIndex={0}
               aria-label="Редактировать скрипт"
+              data-onboarding="edit-script"
             >
               <Edit2 className="w-4 h-4" />
               Редактировать

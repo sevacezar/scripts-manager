@@ -158,6 +158,7 @@ async def create_user(db: AsyncSession, login: str, password: str, is_admin: boo
         login=login,
         password_hash=password_hash,
         is_admin=is_admin,
+        needs_onboarding=True,  # New users need onboarding by default
     )
     
     db.add(new_user)
@@ -188,6 +189,43 @@ async def authenticate_user(db: AsyncSession, login: str, password: str) -> User
     
     if not verify_password(password, user.password_hash):
         return None
+    
+    return user
+
+
+async def update_onboarding_status(
+    db: AsyncSession,
+    user_id: int,
+    needs_onboarding: bool,
+) -> User:
+    """
+    Update user onboarding status.
+    
+    Args:
+        db: Database session
+        user_id: User ID
+        needs_onboarding: Whether user needs onboarding
+        
+    Returns:
+        Updated User object
+        
+    Raises:
+        ValueError: If user not found
+    """
+    user: User | None = await get_user_by_id(db, user_id)
+    
+    if not user:
+        raise ValueError(f"Пользователь с ID {user_id} не найден")
+    
+    user.needs_onboarding = needs_onboarding
+    await db.commit()
+    await db.refresh(user)
+    
+    logger.info(
+        "Onboarding status updated",
+        user_id=user_id,
+        needs_onboarding=needs_onboarding,
+    )
     
     return user
 

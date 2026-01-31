@@ -81,6 +81,36 @@ async def health_check():
     return {"status": "healthy"}
 
 
+@app.get(f"{settings.api_prefix}/examples/execute_script_example.py", tags=["examples"])
+async def get_code_example():
+    """
+    Get example code for executing scripts from тНавигатор.
+    
+    Returns:
+        Plain text content of the example file
+    """
+    example_file = Path(__file__).parent.parent / "examples" / "execute_script_example.py"
+    
+    logger.info("Reading example file", path=str(example_file), exists=example_file.exists())
+    
+    if not example_file.exists():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Example file not found")
+    
+    try:
+        content = example_file.read_text(encoding="utf-8")
+        logger.info("Example file read successfully", length=len(content))
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(
+            content=content,
+            headers={"Cache-Control": "no-cache"},
+        )
+    except Exception as e:
+        from fastapi import HTTPException
+        logger.error("Failed to read example file", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to read example file: {str(e)}")
+
+
 # Serve static frontend files
 if STATIC_DIR.exists():
     # Mount static assets (JS, CSS, images)
@@ -140,3 +170,7 @@ else:
         message="Frontend will not be served. Build frontend with 'npm run build'",
     )
 
+if __name__ == "__main__":
+
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

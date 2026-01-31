@@ -13,6 +13,8 @@ import type {
   UpdateScriptRequest,
   ApiError,
   ScriptExecutionResponse,
+  UserResponse,
+  OnboardingStatusUpdate,
 } from '../types/api';
 
 const API_BASE_URL = '/api/v1';
@@ -119,6 +121,18 @@ class ApiClient {
   async login(data: LoginRequest): Promise<AuthResponse> {
     return this.request<AuthResponse>('/auth/login', {
       method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getCurrentUser(): Promise<UserResponse> {
+    return this.request<UserResponse>('/auth/me');
+  }
+
+  async updateOnboardingStatus(needsOnboarding: boolean): Promise<UserResponse> {
+    const data: OnboardingStatusUpdate = { needs_onboarding: needsOnboarding };
+    return this.request<UserResponse>('/auth/onboarding-status', {
+      method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
@@ -268,6 +282,25 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  async getCodeExample(): Promise<string> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/examples/execute_script_example.py`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to fetch code example:', response.status, errorText);
+        throw new Error(`Failed to fetch code example: ${response.status}`);
+      }
+      const text = await response.text();
+      if (!text || text.trim() === '' || text === 'null') {
+        throw new Error('Получен пустой ответ от сервера');
+      }
+      return text;
+    } catch (error) {
+      console.error('Error in getCodeExample:', error);
+      throw error;
+    }
   }
 }
 

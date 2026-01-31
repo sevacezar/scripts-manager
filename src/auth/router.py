@@ -7,11 +7,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import get_current_active_user
 from src.auth.models import User
-from src.auth.schemas import Token, UserCreate, UserLogin, UserResponse
+from src.auth.schemas import (
+    OnboardingStatusUpdate,
+    Token,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+)
 from src.auth.service import (
     authenticate_user,
     create_access_token,
     create_user,
+    update_onboarding_status,
 )
 from src.config import settings
 from src.database import get_db
@@ -167,4 +174,66 @@ async def get_me(
         Current user information
     """
     return UserResponse.model_validate(current_user)
+
+
+@router.patch(
+    "/onboarding-status",
+    response_model=UserResponse,
+    summary="Update onboarding status",
+    description="Update whether current user needs onboarding.",
+)
+async def update_onboarding_status_endpoint(
+    status_update: OnboardingStatusUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserResponse:
+    """
+    Update onboarding status for current user.
+    
+    Args:
+        status_update: Onboarding status update data
+        current_user: Current authenticated user
+        db: Database session
+        
+    Returns:
+        Updated user information
+        
+    Raises:
+        HTTPException: If user not found or update fails
+    """
+    try:
+        updated_user: User = await update_onboarding_status(
+            db=db,
+            user_id=current_user.id,
+            needs_onboarding=status_update.needs_onboarding,
+        )
+        
+        logger.info(
+            "Onboarding status updated via API",
+            user_id=current_user.id,
+            needs_onboarding=status_update.needs_onboarding,
+        )
+        
+        return UserResponse.model_validate(updated_user)
+        
+    except ValueError as e:
+        logger.warning(
+            "Onboarding status update failed",
+            error=str(e),
+            user_id=current_user.id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(
+            "Onboarding status update error",
+            error=str(e),
+            user_id=current_user.id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Не удалось обновить статус онбординга",
+        )
 

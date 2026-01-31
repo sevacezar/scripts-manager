@@ -29,6 +29,7 @@ class UserResponse(UserBase):
 
     id: int = Field(description="User ID")
     is_admin: bool = Field(description="Is user admin")
+    needs_onboarding: bool = Field(description="Whether user needs onboarding")
     created_at: datetime = Field(description="User creation timestamp")
     updated_at: datetime = Field(description="User last update timestamp")
 
@@ -50,4 +51,10 @@ class TokenData(BaseModel):
 
     user_id: int | None = None
     login: str | None = None
+
+
+class OnboardingStatusUpdate(BaseModel):
+    """Schema for updating onboarding status."""
+
+    needs_onboarding: bool = Field(description="Whether user needs onboarding")
 

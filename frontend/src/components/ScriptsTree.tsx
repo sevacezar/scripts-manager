@@ -82,6 +82,7 @@ const FolderItem = ({ folderItem, level, onRefresh, onViewScript, expandedFolder
             tabIndex={0}
             aria-label="Создать подпапку"
             title="Создать подпапку"
+            data-onboarding="new-folder-inline"
           >
             + Папка
           </button>
@@ -468,6 +469,7 @@ const ScriptsTree = () => {
               onClick={() => setShowCreateFolder(true)}
               className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark text-sm"
               tabIndex={0}
+              data-onboarding="new-folder-top"
             >
               + Новая папка
             </button>
@@ -475,6 +477,7 @@ const ScriptsTree = () => {
               onClick={() => setShowCreateScript(true)}
               className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark text-sm"
               tabIndex={0}
+              data-onboarding="new-script-top"
             >
               + Новый скрипт
             </button>

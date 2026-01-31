@@ -17,6 +17,7 @@ class User(Base):
     login: str = Column(String, unique=True, index=True, nullable=False)
     password_hash: str = Column(String, nullable=False)
     is_admin: bool = Column(Boolean, default=False, nullable=False)
+    needs_onboarding: bool = Column(Boolean, default=True, nullable=False)
     created_at: datetime = Column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -31,5 +32,5 @@ class User(Base):
 
     def __repr__(self) -> str:
         """String representation of User."""
-        return f"<User(id={self.id}, login='{self.login}', is_admin={self.is_admin})>"
+        return f"<User(id={self.id}, login='{self.login}', is_admin={self.is_admin}, needs_onboarding={self.needs_onboarding})>"
 

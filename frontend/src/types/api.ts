@@ -3,6 +3,19 @@ export interface User {
   login: string;
 }
 
+export interface UserResponse {
+  id: number;
+  login: string;
+  is_admin: boolean;
+  needs_onboarding: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OnboardingStatusUpdate {
+  needs_onboarding: boolean;
+}
+
 export interface AuthResponse {
   access_token: string;
   token_type: string;
