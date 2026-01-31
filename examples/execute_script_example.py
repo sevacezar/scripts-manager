@@ -95,7 +95,7 @@ script_path = 'test/test.py'
 
 # Данные для передачи в скрипт
 script_data = {
-    'name': 'Тест',
+    'name': 'Test',
     'value': 42,
 }
 
